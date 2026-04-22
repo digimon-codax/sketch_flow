@@ -1,23 +1,19 @@
 import 'dotenv/config';
 import { createServer } from 'http';
-import { Server } from 'socket.io';
 import app from './app.js';
-import { registerCanvasSocket } from './sockets/canvasSocket.js';
+import { initWebSocketServer } from './ws/wsServer.js';
+import { connectRedis } from './services/redisService.js';
 
 const PORT = process.env.PORT || 3001;
 
 // Create HTTP server from Express app
 const httpServer = createServer(app);
 
-// Attach Socket.io
-const io = new Server(httpServer, {
-  cors: { origin: '*', methods: ['GET', 'POST'] },
-});
+// Connect to Redis Pub/Sub
+connectRedis();
 
-// Register socket handlers for each connection
-io.on('connection', (socket) => {
-  registerCanvasSocket(socket, io);
-});
+// Initialize native WebSocket Server
+initWebSocketServer(httpServer);
 
 // Start server
 httpServer.listen(PORT, () => {

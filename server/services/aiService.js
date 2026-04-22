@@ -1,62 +1,121 @@
-import openai from '../config/openai.js';
+import Anthropic from '@anthropic-ai/sdk';
 
-const ARCHITECTURE_PROMPT = `You are a senior cloud architect. Analyze the following system architecture JSON.
+// Provide a dummy key if not set to prevent SDK crash
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY || 'sk-ant-dummy-key',
+});
 
-Your response must cover:
-1. **Single Points of Failure** — identify which nodes or connections are critical bottlenecks.
-2. **AWS/GCP Service Recommendations** — suggest specific managed services that could replace or improve each component.
-3. **Database Optimizations** — recommend indexing strategies, caching layers (Redis, Memcached), or read replicas.
-4. **Scalability Concerns** — flag any components that won't scale horizontally.
+const isSimulation = !process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY.includes('dummy');
 
-Keep your response concise, structured, and actionable. Use bullet points.`;
-
-/**
- * Calls the LLM with the cleaned architecture payload.
- * Returns the AI response string.
- */
-export const analyzeWithAI = async (canvasState) => {
-  // Simulation mode — no API key
-  if (!process.env.OPENAI_API_KEY) {
-    return simulateAnalysis(canvasState);
+export const cleanupLayoutAI = async (objects) => {
+  if (isSimulation) {
+    console.warn('[AI] Simulation mode: Returning fake cleanup layout');
+    return objects.map((obj, i) => ({
+      id: obj.id,
+      left: 100 + (i % 5) * 150,
+      top: 100 + Math.floor(i / 5) * 150
+    }));
   }
 
-  const userMessage = `${ARCHITECTURE_PROMPT}\n\nArchitecture JSON:\n${JSON.stringify(canvasState, null, 2)}`;
+  const prompt = `You are a diagram layout engine. You will receive a list of canvas objects from a Fabric.js diagram. Each object has an id, type, and approximate position.
 
-  const response = await openai.chat.completions.create({
-    model: 'gpt-4o',
-    messages: [{ role: 'user', content: userMessage }],
-    max_tokens: 1000,
-    temperature: 0.4,
+Your job is to reorganize them into a clean, readable hierarchical layout following these rules:
+- Identify logical groupings (e.g. clients, servers, databases, caches)
+- Arrange in a top-down flow: clients at top, databases at bottom
+- Align elements in clean rows and columns on a grid (snap to 120px horizontal, 100px vertical increments)
+- Ensure no overlapping, generous spacing between nodes
+- Keep arrows/connectors pointing in logical directions
+
+Return ONLY valid JSON in this exact format, no explanation:
+{
+  "layout": [
+    { "id": "object-id", "left": 120, "top": 80 }
+  ]
+}
+
+Canvas objects:
+${JSON.stringify(objects)}`;
+
+  const response = await anthropic.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 2000,
+    messages: [{ role: 'user', content: prompt }]
   });
 
-  return response.choices[0].message.content;
+  try {
+    const rawContent = response.content[0].text;
+    const jsonStr = rawContent.substring(rawContent.indexOf('{'), rawContent.lastIndexOf('}') + 1);
+    const parsed = JSON.parse(jsonStr);
+    return parsed.layout;
+  } catch (err) {
+    console.error('[AI] Failed to parse cleanup layout:', err);
+    throw new Error('Failed to parse AI response');
+  }
 };
 
-/**
- * Returns a deterministic fake analysis when no API key is set.
- * Useful for local dev and demos.
- */
-const simulateAnalysis = (canvasState) => {
-  const nodeCount = canvasState.nodeCount || 0;
-  const edgeCount = canvasState.edgeCount || 0;
+export const assistArchitectureAI = async (imageBase64, objects) => {
+  if (isSimulation) {
+    console.warn('[AI] Simulation mode: Returning fake assist suggestions');
+    return {
+      suggestions: [
+        {
+          type: "missing",
+          severity: "high",
+          title: "Simulation DB Replica",
+          description: "Database is a single point of failure.",
+          recommendation: "Add a read replica."
+        }
+      ],
+      scalabilityScore: 7,
+      summary: "Simulated response — add your Anthropic API key to .env"
+    };
+  }
 
-  return `## Simulation Mode (No OPENAI_API_KEY set)
+  // Strip the "data:image/png;base64," prefix if present
+  const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, "");
 
-## Single Points of Failure
-- ${nodeCount} node(s) detected — no redundancy configured.
-- ${edgeCount > 0 ? `${edgeCount} edge(s) found — recommend adding circuit breakers.` : 'No edges found — architecture appears disconnected.'}
+  const prompt = `You are a senior software architect reviewing a system design diagram.
 
-## AWS/GCP Recommendations
-- Replace monolithic nodes with AWS Lambda or GCP Cloud Run for stateless services.
-- Use AWS API Gateway or GCP Apigee for centralized traffic management.
-- Introduce AWS RDS Multi-AZ or Cloud Spanner for high-availability databases.
+You will receive:
+1. A screenshot of the diagram
+2. A JSON list of the labeled elements on the canvas
 
-## Database Optimizations
-- Add a Redis caching layer in front of read-heavy endpoints.
-- Implement connection pooling (e.g., PgBouncer).
-- Add composite indexes on frequently queried foreign keys.
+Analyze the architecture and return a JSON response ONLY (no explanation, no markdown) in this format:
+{
+  "suggestions": [
+    {
+      "type": "missing",
+      "severity": "high" | "medium" | "low",
+      "title": "Short title",
+      "description": "1-2 sentence explanation",
+      "recommendation": "Specific actionable fix"
+    }
+  ],
+  "scalabilityScore": 6,
+  "summary": "One sentence overall assessment"
+}
 
-## Scalability Concerns
-- No load balancer detected — add AWS ALB or GCP Load Balancer.
-- Consider introducing a message queue (SQS/Pub-Sub) for async workloads.`;
+Canvas elements:
+${JSON.stringify(objects)}`;
+
+  const response = await anthropic.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 1500,
+    messages: [{
+      role: 'user',
+      content: [
+        { type: 'image', source: { type: 'base64', media_type: 'image/png', data: base64Data } },
+        { type: 'text', text: prompt }
+      ]
+    }]
+  });
+
+  try {
+    const rawContent = response.content[0].text;
+    const jsonStr = rawContent.substring(rawContent.indexOf('{'), rawContent.lastIndexOf('}') + 1);
+    return JSON.parse(jsonStr);
+  } catch (err) {
+    console.error('[AI] Failed to parse assist response:', err);
+    throw new Error('Failed to parse AI response');
+  }
 };
