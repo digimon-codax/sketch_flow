@@ -1,3 +1,5 @@
+import express from 'express';
+import cors from 'cors';
 import path from 'path';
 import authRouter from './routes/auth.js';
 import diagramsRouter from './routes/diagrams.js';
