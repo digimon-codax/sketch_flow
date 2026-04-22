@@ -15,8 +15,13 @@ import { UserAvatarStack } from './UserAvatarStack';
 export const DiagramRoom = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { canvas, canvasRef, containerRef } = useCanvas(id);
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const { canvas, canvasRef, containerRef } = useCanvas(id, loading);
   const { cursors } = useCollaboration(id, canvas);
+
   const setActiveDiagram = useDiagramStore((state) => state.setActiveDiagram);
   const setCollaborators = useDiagramStore((state) => state.setCollaborators);
   const collaborators = useDiagramStore((state) => state.collaborators);
@@ -24,9 +29,7 @@ export const DiagramRoom = () => {
   const aiAnalysisResult = useUIStore((state) => state.aiAnalysisResult);
   const setAiAnalysisResult = useUIStore((state) => state.setAiAnalysisResult);
 
-  const [loading, setLoading] = useState(true);
-
-  // Load Diagram metadata and members
+  // Load diagram metadata
   useEffect(() => {
     let active = true;
     const fetchDiagram = async () => {
@@ -34,36 +37,61 @@ export const DiagramRoom = () => {
         const diagram = await getDiagram(id);
         if (active) {
           setActiveDiagram(diagram.id, diagram.name);
-          setCollaborators(diagram.members);
+          setCollaborators(diagram.members ?? []);
           setLoading(false);
         }
       } catch (err) {
         console.error('Failed to load diagram:', err);
-        navigate('/'); // Redirect to dashboard if access denied or not found
+        if (active) {
+          setError('Could not load diagram. Redirecting...');
+          setTimeout(() => navigate('/'), 1500);
+        }
       }
     };
     fetchDiagram();
     return () => { active = false; };
-  }, [id, navigate, setActiveDiagram, setCollaborators]);
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (loading) return <div className="flex items-center justify-center h-screen">Loading workspace...</div>;
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-50 text-gray-500">
+        {error}
+      </div>
+    );
+  }
 
-  // Find active element object from canvas for the ContextPanel
-  const activeObject = activeElementId && canvas ? canvas.getObjects().find(o => o.id === activeElementId) : null;
-  const activeUserIds = Object.keys(cursors); // This tracks connected users (remote)
-  
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen bg-gray-50 gap-3">
+        <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm text-gray-500 font-medium">Loading workspace...</p>
+      </div>
+    );
+  }
+
+  const activeObject = activeElementId && canvas
+    ? canvas.getObjects().find((o) => o.id === activeElementId)
+    : null;
+  const activeUserIds = Object.keys(cursors);
+
   return (
-    <main className="w-full h-screen relative bg-gray-50 overflow-hidden font-sans">
-      <div className="absolute inset-0 z-0 pointer-events-none opacity-[0.03] bg-[radial-gradient(#000_1px,transparent_1px)] [background-size:16px_16px]"></div>
-      
-      <UserAvatarStack activeUserIds={activeUserIds} members={collaborators} />
+    <main className="w-full h-screen relative overflow-hidden font-sans bg-[#f8f9fa]">
+      {/* Toolbar floats at top-center */}
       <Toolbar canvas={canvas} />
+
+      {/* Avatar stack top-right */}
+      <UserAvatarStack activeUserIds={activeUserIds} members={collaborators} />
+
+      {/* Remote cursor overlay */}
       <CursorOverlay cursors={cursors} canvas={canvas} />
-      
-      <Canvas canvas={canvas} canvasRef={canvasRef} containerRef={containerRef} />
-      
+
+      {/* Fabric.js canvas fills the whole screen */}
+      <Canvas canvasRef={canvasRef} containerRef={containerRef} />
+
+      {/* Right-side context panel for selected shapes */}
       <ContextPanel activeObject={activeObject} diagramId={id} />
-      
+
+      {/* AI analysis overlay */}
       {aiAnalysisResult && (
         <AIOverlay analysis={aiAnalysisResult} onClose={() => setAiAnalysisResult(null)} />
       )}

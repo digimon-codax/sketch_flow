@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { register, login } from '../api/authApi';
 
@@ -9,6 +10,7 @@ export const AuthPage = () => {
   const [name, setName] = useState('Demo User');
   const [error, setError] = useState('');
   const setAuth = useAuthStore((state) => state.setAuth);
+  const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -21,6 +23,7 @@ export const AuthPage = () => {
         const data = await register(name, email, password);
         setAuth(data.user, data.token);
       }
+      navigate('/');
     } catch (err) {
       setError(err.response?.data?.error || 'Authentication failed');
     }

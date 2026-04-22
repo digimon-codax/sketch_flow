@@ -13,8 +13,8 @@ router.post('/register', async (req, res) => {
     const data = await registerUser(name, email, password);
     res.status(201).json(data);
   } catch (error) {
-    if (error.message === 'Email already in use') {
-      return res.status(409).json({ error: error.message });
+    if (error.message === 'Email already in use' || error.code === 'P2002') {
+      return res.status(409).json({ error: 'Email already in use' });
     }
     console.error('[/api/auth/register] Error:', error);
     res.status(500).json({ error: 'Internal server error' });

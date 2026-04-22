@@ -2,6 +2,7 @@ import { useState } from 'react';
 import * as fabric from 'fabric';
 import { cleanupLayout, assistArchitecture } from '../api/aiApi';
 import { useUIStore } from '../store/uiStore';
+import { Square, Circle, Minus } from 'lucide-react';
 
 export const Toolbar = ({ canvas }) => {
   const [isCleaning, setIsCleaning] = useState(false);
@@ -11,64 +12,105 @@ export const Toolbar = ({ canvas }) => {
   const addShape = (type) => {
     if (!canvas) return;
     let shape;
-    
+
     const commonProps = {
-      left: 100 + Math.random() * 100,
-      top: 100 + Math.random() * 100,
-      shadow: new fabric.Shadow({ color: 'rgba(0,0,0,0.1)', blur: 10, offsetY: 4 }),
+      fill: 'rgba(255, 255, 255, 0.01)',
+      stroke: '#1e1e1e',
+      strokeWidth: 2.5,
+      strokeLineJoin: 'round',
+      strokeLineCap: 'round',
+      shadow: new fabric.Shadow({ color: 'rgba(0,0,0,0.06)', blur: 4, offsetY: 2 }),
     };
 
+    const center = canvas.getVpCenter();
+    const cx = center.x + (Math.random() * 40 - 20);
+    const cy = center.y + (Math.random() * 40 - 20);
+    commonProps.left = cx;
+    commonProps.top = cy;
+
     if (type === 'rect') {
-      shape = new fabric.Rect({ ...commonProps, width: 120, height: 60, fill: '#3b82f6', rx: 8, ry: 8 });
+      shape = new fabric.Rect({ ...commonProps, width: 120, height: 80, rx: 12, ry: 12 });
     } else if (type === 'circle') {
-      shape = new fabric.Circle({ ...commonProps, radius: 40, fill: '#10b981' });
+      shape = new fabric.Circle({ ...commonProps, radius: 45 });
     } else if (type === 'line') {
-      shape = new fabric.Line([100, 200, 300, 200], { stroke: '#6b7280', strokeWidth: 2 });
+      shape = new fabric.Line([cx - 60, cy, cx + 60, cy], { ...commonProps, fill: undefined });
     }
 
     if (shape) {
       canvas.add(shape);
       canvas.setActiveObject(shape);
+      canvas.requestRenderAll();
     }
   };
 
   const handleCleanUp = async () => {
     if (!canvas || isCleaning) return;
+
+    // Collect all non-grid objects with their IDs
+    const objectsToLayout = canvas.getObjects().filter(o => o.id && !o.excludeFromExport);
+    if (objectsToLayout.length === 0) {
+      alert('Add some shapes to the canvas first!');
+      return;
+    }
+
     setIsCleaning(true);
     try {
-      const objectsJSON = canvas.toJSON(['id']).objects;
-      const { layout } = await cleanupLayout(objectsJSON);
-      
-      layout.forEach(({ id, left, top }) => {
-        const obj = canvas.getObjects().find((o) => o.id === id);
-        if (obj) {
-          fabric.util.animate({
-            startValue: 0,
-            endValue: 1,
-            duration: 600,
-            easing: fabric.util.ease.easeInOutCubic,
-            onChange: (val) => {
-              const currentLeft = obj.left;
-              const currentTop = obj.top;
-              obj.set({ left: currentLeft + (left - currentLeft) * val, top: currentTop + (top - currentTop) * val });
-              canvas.renderAll();
-            },
-            onComplete: () => {
-              obj.setCoords();
-              canvas.renderAll();
-            }
-          });
-        }
-      });
-      
-      // Allow time for animation before firing delta manually if needed (or rely on modified events)
-      setTimeout(() => {
-        setIsCleaning(false);
-        canvas.fire('object:modified'); 
-      }, 700);
+      const objectsJSON = objectsToLayout.map(o => ({
+        id: o.id,
+        type: o.type,
+        left: o.left,
+        top: o.top,
+        width: o.width,
+        height: o.height,
+      }));
 
+      const { layout } = await cleanupLayout(objectsJSON);
+      if (!layout || !Array.isArray(layout)) throw new Error('Invalid layout from server');
+
+      // Fabric v7 removed fabric.util.animate — use requestAnimationFrame instead
+      const DURATION = 600; // ms
+      const start = performance.now();
+
+      // Store initial positions
+      const initial = {};
+      layout.forEach(({ id, left, top }) => {
+        const obj = canvas.getObjects().find(o => o.id === id);
+        if (obj) initial[id] = { fromLeft: obj.left, fromTop: obj.top, toLeft: left, toTop: top };
+      });
+
+      const easeInOutCubic = (t) =>
+        t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
+      const animate = (now) => {
+        const elapsed = now - start;
+        const raw = Math.min(elapsed / DURATION, 1);
+        const t = easeInOutCubic(raw);
+
+        layout.forEach(({ id }) => {
+          const obj = canvas.getObjects().find(o => o.id === id);
+          const pos = initial[id];
+          if (!obj || !pos) return;
+          obj.set({
+            left: pos.fromLeft + (pos.toLeft - pos.fromLeft) * t,
+            top:  pos.fromTop  + (pos.toTop  - pos.fromTop)  * t,
+          });
+          obj.setCoords();
+        });
+
+        canvas.requestRenderAll();
+
+        if (raw < 1) {
+          requestAnimationFrame(animate);
+        } else {
+          // Done — trigger a save + WS broadcast
+          canvas.fire('object:modified');
+          setIsCleaning(false);
+        }
+      };
+
+      requestAnimationFrame(animate);
     } catch (err) {
-      console.error(err);
+      console.error('[CleanUp] Error:', err);
       setIsCleaning(false);
     }
   };
@@ -90,19 +132,19 @@ export const Toolbar = ({ canvas }) => {
   };
 
   return (
-    <div className="absolute top-6 left-1/2 -translate-x-1/2 bg-white/80 backdrop-blur-md px-5 py-2.5 rounded-full shadow-lg border border-gray-200 flex items-center gap-3 z-10 select-none">
-      <div className="flex items-center gap-1 border-r border-gray-200 pr-3">
-        <button onClick={() => addShape('rect')} className="p-2 hover:bg-blue-50 rounded-lg group"><div className="w-5 h-5 bg-blue-500 rounded group-hover:scale-110 transition-transform" /></button>
-        <button onClick={() => addShape('circle')} className="p-2 hover:bg-emerald-50 rounded-lg group"><div className="w-5 h-5 bg-emerald-500 rounded-full group-hover:scale-110 transition-transform" /></button>
-        <button onClick={() => addShape('line')} className="p-2 hover:bg-gray-100 rounded-lg group"><div className="w-5 h-0.5 bg-gray-500 my-2.5 group-hover:scale-110 transition-transform" /></button>
+    <div className="absolute top-6 left-1/2 -translate-x-1/2 bg-white px-3 py-2 rounded-2xl shadow-[0_4px_12px_rgba(0,0,0,0.08)] border border-gray-100 flex items-center gap-3 z-10 select-none">
+      <div className="flex items-center gap-1 border-r border-gray-100 pr-3">
+        <button onClick={() => addShape('rect')} className="p-2.5 hover:bg-indigo-50 text-gray-700 hover:text-indigo-600 rounded-xl transition-colors"><Square size={20} strokeWidth={2.5} /></button>
+        <button onClick={() => addShape('circle')} className="p-2.5 hover:bg-indigo-50 text-gray-700 hover:text-indigo-600 rounded-xl transition-colors"><Circle size={20} strokeWidth={2.5} /></button>
+        <button onClick={() => addShape('line')} className="p-2.5 hover:bg-indigo-50 text-gray-700 hover:text-indigo-600 rounded-xl transition-colors"><Minus size={20} strokeWidth={2.5} /></button>
       </div>
 
-      <button onClick={handleCleanUp} disabled={isCleaning} className="flex items-center gap-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 px-4 py-1.5 rounded-lg shadow-sm transition-colors">
+      <button onClick={handleCleanUp} disabled={isCleaning} className="flex items-center gap-2 text-sm font-semibold text-gray-700 bg-gray-50 hover:bg-gray-100 border border-gray-200 disabled:opacity-60 px-4 py-2 rounded-xl transition-colors">
         <span className={isCleaning ? 'animate-spin' : ''}>✨</span>
-        {isCleaning ? 'Cleaning...' : 'Clean Up Layout'}
+        {isCleaning ? 'Cleaning...' : 'Clean Up'}
       </button>
 
-      <button onClick={handleAnalyze} disabled={isAnalyzing} className="flex items-center gap-1.5 text-xs font-semibold text-white bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 disabled:opacity-60 px-4 py-1.5 rounded-lg shadow-sm transition-colors">
+      <button onClick={handleAnalyze} disabled={isAnalyzing} className="flex items-center gap-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 px-4 py-2 rounded-xl shadow-sm transition-colors">
         <span className={isAnalyzing ? 'animate-pulse' : ''}>🧠</span>
         {isAnalyzing ? 'Analyzing...' : 'Arch Assist'}
       </button>
