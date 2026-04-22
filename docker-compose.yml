@@ -1,17 +1,22 @@
 version: '3.8'
 
 services:
-  postgres:
-    image: postgres:15-alpine
+  mongodb:
+    image: mongo:latest
     restart: unless-stopped
-    environment:
-      POSTGRES_USER: sketchflow
-      POSTGRES_PASSWORD: sketchflow
-      POSTGRES_DB: sketchflow
     ports:
-      - "5432:5432"
+      - "27017:27017"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - mongodb_data:/data/db
+    # MongoDB needs to be a replica set for Prisma to use transactions
+    command: ["--replSet", "rs0", "--bind_ip_all", "--port", "27017"]
+    healthcheck:
+      test: echo "try { rs.status() } catch (err) { rs.initiate({_id:'rs0',members:[{_id:0,host:'localhost:27017'}]}) }" | mongosh --port 27017 --quiet
+      interval: 5s
+      timeout: 30s
+      start_period: 0s
+      start_interval: 1s
+      retries: 30
 
   redis:
     image: redis:7-alpine
@@ -23,5 +28,5 @@ services:
     command: redis-server --appendonly yes
 
 volumes:
-  postgres_data:
+  mongodb_data:
   redis_data:
