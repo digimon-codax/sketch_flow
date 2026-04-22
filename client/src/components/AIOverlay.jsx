@@ -1,117 +1,90 @@
-import { useEffect, useRef } from 'react';
+import React from 'react';
 
 export const AIOverlay = ({ analysis, onClose }) => {
-  const panelRef = useRef(null);
-
-  // Allow dragging the panel
-  useEffect(() => {
-    const panel = panelRef.current;
-    if (!panel) return;
-
-    let isDragging = false;
-    let startX, startY, initLeft, initTop;
-
-    const onMouseDown = (e) => {
-      if (!e.target.closest('.drag-handle')) return;
-      isDragging = true;
-      startX = e.clientX;
-      startY = e.clientY;
-      const rect = panel.getBoundingClientRect();
-      initLeft = rect.left;
-      initTop = rect.top;
-      panel.style.transition = 'none';
-    };
-
-    const onMouseMove = (e) => {
-      if (!isDragging) return;
-      const dx = e.clientX - startX;
-      const dy = e.clientY - startY;
-      panel.style.left = `${initLeft + dx}px`;
-      panel.style.top = `${initTop + dy}px`;
-      panel.style.right = 'auto';
-      panel.style.bottom = 'auto';
-    };
-
-    const onMouseUp = () => { isDragging = false; };
-
-    window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup', onMouseUp);
-    panel.addEventListener('mousedown', onMouseDown);
-
-    return () => {
-      window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseup', onMouseUp);
-      panel.removeEventListener('mousedown', onMouseDown);
-    };
-  }, []);
-
   if (!analysis) return null;
 
-  // Format the analysis text into sections
-  const lines = analysis.split('\n').filter(Boolean);
-
   return (
-    <div
-      ref={panelRef}
-      className="fixed bottom-8 right-8 w-[420px] max-h-[60vh] flex flex-col z-50 animate-fade-in"
-      style={{ animation: 'fadeInUp 0.35s ease forwards' }}
-    >
-      {/* Glass card */}
-      <div className="bg-gray-900/90 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm" style={{ animation: 'fadeIn 0.2s ease forwards' }}>
+      <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[85vh] flex flex-col overflow-hidden relative">
         
-        {/* Header – drag handle */}
-        <div className="drag-handle flex items-center justify-between px-5 py-4 border-b border-white/10 cursor-move select-none">
-          <div className="flex items-center gap-2">
-            <span className="text-lg">🧠</span>
-            <span className="text-white font-semibold text-sm tracking-wide">Architecture Analysis</span>
+        {/* Header */}
+        <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-purple-50 to-pink-50">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center text-xl">🧠</div>
+            <div>
+              <h2 className="font-bold text-gray-900 text-lg">Architecture Analysis</h2>
+              <p className="text-xs text-gray-500 font-medium tracking-wide uppercase">Claude Sonnet 3.5 Vision</p>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-full">AI</span>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-white transition-colors w-6 h-6 flex items-center justify-center rounded-full hover:bg-white/10"
-            >
-              ✕
-            </button>
-          </div>
+          <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-700 bg-white/50 hover:bg-white rounded-full transition-colors">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
         </div>
 
         {/* Content */}
-        <div className="overflow-y-auto p-5 space-y-3 scrollbar-thin">
-          {lines.map((line, i) => {
-            // Bold headers that start with # or **
-            if (line.startsWith('##') || line.startsWith('**')) {
-              return (
-                <h3 key={i} className="text-white font-semibold text-sm mt-4 first:mt-0">
-                  {line.replace(/^#+\s*/, '').replace(/\*\*/g, '')}
-                </h3>
-              );
-            }
-            if (line.startsWith('-') || line.startsWith('•')) {
-              return (
-                <div key={i} className="flex gap-2 text-gray-300 text-sm">
-                  <span className="text-indigo-400 mt-0.5 flex-shrink-0">›</span>
-                  <span>{line.replace(/^[-•]\s*/, '')}</span>
+        <div className="flex-1 overflow-y-auto p-6 bg-gray-50/30">
+          
+          {analysis.error ? (
+            <div className="p-4 bg-red-50 text-red-600 rounded-xl border border-red-100 font-medium">
+              {analysis.error}
+            </div>
+          ) : (
+            <>
+              {/* Score & Summary */}
+              <div className="flex items-start gap-6 mb-8">
+                <div className="flex-shrink-0 flex flex-col items-center justify-center w-24 h-24 rounded-2xl bg-white shadow-sm border border-gray-100">
+                  <span className="text-3xl font-black text-indigo-600 tracking-tighter">{analysis.scalabilityScore}<span className="text-xl text-gray-400">/10</span></span>
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Score</span>
                 </div>
-              );
-            }
-            return (
-              <p key={i} className="text-gray-300 text-sm leading-relaxed">
-                {line}
-              </p>
-            );
-          })}
-        </div>
+                <div className="pt-2">
+                  <h3 className="text-sm font-bold text-gray-900 mb-2 uppercase tracking-wider">Executive Summary</h3>
+                  <p className="text-gray-700 leading-relaxed">{analysis.summary}</p>
+                </div>
+              </div>
 
-        {/* Footer */}
-        <div className="px-5 py-3 border-t border-white/10 flex items-center justify-between">
-          <span className="text-xs text-gray-500">Powered by GPT-4o</span>
-          <button
-            onClick={onClose}
-            className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors font-medium"
-          >
-            Dismiss
-          </button>
+              {/* Suggestions */}
+              <div>
+                <h3 className="text-sm font-bold text-gray-900 mb-4 uppercase tracking-wider flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
+                  Key Recommendations
+                </h3>
+                
+                <div className="space-y-4">
+                  {analysis.suggestions?.map((sug, i) => (
+                    <div key={i} className="bg-white rounded-xl p-5 border border-gray-100 shadow-sm relative overflow-hidden group hover:border-indigo-200 transition-colors">
+                      <div className={`absolute top-0 left-0 w-1 h-full ${
+                        sug.severity === 'high' ? 'bg-red-500' : 
+                        sug.severity === 'medium' ? 'bg-amber-500' : 'bg-blue-500'
+                      }`} />
+                      
+                      <div className="flex items-start justify-between mb-2">
+                        <h4 className="font-semibold text-gray-900 pr-4">{sug.title}</h4>
+                        <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider whitespace-nowrap ${
+                          sug.severity === 'high' ? 'bg-red-50 text-red-600' : 
+                          sug.severity === 'medium' ? 'bg-amber-50 text-amber-600' : 'bg-blue-50 text-blue-600'
+                        }`}>
+                          {sug.severity}
+                        </span>
+                      </div>
+                      
+                      <p className="text-sm text-gray-600 mb-3 leading-relaxed">{sug.description}</p>
+                      
+                      <div className="bg-gray-50 rounded-lg p-3 border border-gray-100 flex items-start gap-2">
+                        <span className="text-indigo-500 mt-0.5">💡</span>
+                        <p className="text-sm font-medium text-gray-800">{sug.recommendation}</p>
+                      </div>
+                    </div>
+                  ))}
+
+                  {(!analysis.suggestions || analysis.suggestions.length === 0) && (
+                    <div className="text-center py-10 bg-white rounded-xl border border-dashed border-gray-200 text-gray-500">
+                      Architecture looks solid. No major suggestions right now.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
