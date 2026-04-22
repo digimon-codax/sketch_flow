@@ -1,0 +1,71 @@
+// This is your Prisma schema file
+// Learn more: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String          @id @default(uuid())
+  email     String          @unique
+  password  String
+  name      String
+  diagrams  DiagramMember[]
+  createdAt DateTime        @default(now())
+}
+
+model Diagram {
+  id          String          @id @default(uuid())
+  name        String
+  canvasState Json?           // Full Fabric.js JSON snapshot
+  members     DiagramMember[]
+  elements    Element[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+}
+
+model DiagramMember {
+  id        String  @id @default(uuid())
+  userId    String
+  diagramId String
+  role      String  @default("editor")
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  diagram   Diagram @relation(fields: [diagramId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, diagramId])
+}
+
+model Element {
+  id        String   @id @default(uuid())
+  diagramId String
+  fabricId  String   // Fabric.js object ID
+  diagram   Diagram  @relation(fields: [diagramId], references: [id], onDelete: Cascade)
+  context   Context?
+
+  @@unique([diagramId, fabricId])
+}
+
+model Context {
+  id          String   @id @default(uuid())
+  elementId   String   @unique
+  element     Element  @relation(fields: [elementId], references: [id], onDelete: Cascade)
+  notes       String?
+  links       String[]
+  codeSnippet String?
+  files       File[]
+}
+
+model File {
+  id        String  @id @default(uuid())
+  contextId String
+  context   Context @relation(fields: [contextId], references: [id], onDelete: Cascade)
+  name      String
+  url       String
+  size      Int
+  mimeType  String
+}
