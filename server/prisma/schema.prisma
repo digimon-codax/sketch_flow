@@ -6,12 +6,12 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mongodb"
   url      = env("DATABASE_URL")
 }
 
 model User {
-  id        String          @id @default(uuid())
+  id        String          @id @default(auto()) @map("_id") @db.ObjectId
   email     String          @unique
   password  String
   name      String
@@ -20,7 +20,7 @@ model User {
 }
 
 model Diagram {
-  id          String          @id @default(uuid())
+  id          String          @id @default(auto()) @map("_id") @db.ObjectId
   name        String
   canvasState Json?           // Full Fabric.js JSON snapshot
   members     DiagramMember[]
@@ -30,9 +30,9 @@ model Diagram {
 }
 
 model DiagramMember {
-  id        String  @id @default(uuid())
-  userId    String
-  diagramId String
+  id        String  @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String  @db.ObjectId
+  diagramId String  @db.ObjectId
   role      String  @default("editor")
   user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   diagram   Diagram @relation(fields: [diagramId], references: [id], onDelete: Cascade)
@@ -41,8 +41,8 @@ model DiagramMember {
 }
 
 model Element {
-  id        String   @id @default(uuid())
-  diagramId String
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  diagramId String   @db.ObjectId
   fabricId  String   // Fabric.js object ID
   diagram   Diagram  @relation(fields: [diagramId], references: [id], onDelete: Cascade)
   context   Context?
@@ -51,8 +51,8 @@ model Element {
 }
 
 model Context {
-  id          String   @id @default(uuid())
-  elementId   String   @unique
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  elementId   String   @unique @db.ObjectId
   element     Element  @relation(fields: [elementId], references: [id], onDelete: Cascade)
   notes       String?
   links       String[]
@@ -61,8 +61,8 @@ model Context {
 }
 
 model File {
-  id        String  @id @default(uuid())
-  contextId String
+  id        String  @id @default(auto()) @map("_id") @db.ObjectId
+  contextId String  @db.ObjectId
   context   Context @relation(fields: [contextId], references: [id], onDelete: Cascade)
   name      String
   url       String
