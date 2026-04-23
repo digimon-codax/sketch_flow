@@ -38,7 +38,7 @@ export const useCanvas = (diagramId, loading) => {
     }
   }, [canvas, user]);
 
-  const { sendMessage } = useWebSocket(diagramId, handleSocketMessage);
+  const { send } = useWebSocket(diagramId, handleSocketMessage);
 
   useEffect(() => {
     // ✅ KEY FIX: Wait until the diagram data has loaded and the canvas DOM is rendered
@@ -125,7 +125,7 @@ export const useCanvas = (diagramId, loading) => {
     const emitDelta = () => {
       if (isUpdatingFromServer.current) return;
       const stateJSON = initCanvas.toJSON(['id', 'contextId']);
-      sendMessage('CANVAS_DELTA', { stateJSON });
+      send('CANVAS_DELTA', { stateJSON });
       clearTimeout(saveTimeout);
       saveTimeout = setTimeout(() => {
         if (diagramId) updateDiagram(diagramId, { canvasState: stateJSON }).catch(console.error);

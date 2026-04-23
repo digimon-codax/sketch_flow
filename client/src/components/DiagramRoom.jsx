@@ -1,11 +1,11 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useCanvas } from '../hooks/useCanvas';
-import { useCollaboration } from '../hooks/useCollaboration';
+import { useCanvasEngine } from '../canvas/useCanvasEngine';
+import { useCanvasTools } from '../canvas/useCanvasTools';
 import { useDiagramStore } from '../store/diagramStore';
 import { useUIStore } from '../store/uiStore';
 import { getDiagram } from '../api/diagramsApi';
-import { Canvas } from './Canvas';
+import { CanvasViewport } from '../canvas/CanvasViewport';
 import { Toolbar } from './Toolbar';
 import { ContextPanel } from './ContextPanel';
 import { AIOverlay } from './AIOverlay';
@@ -71,8 +71,7 @@ export const DiagramRoom = () => {
   const [error, setError] = useState(null);
   const [activeTool, setActiveTool] = useState('select');
 
-  const { canvas, canvasRef, containerRef } = useCanvas(id, loading);
-  const { cursors } = useCollaboration(id, canvas);
+  const { canvas, canvasRef, containerRef, remoteCursors = {} } = useCanvasEngine(id, loading);
 
   const setActiveDiagram = useDiagramStore((state) => state.setActiveDiagram);
   const setCollaborators = useDiagramStore((state) => state.setCollaborators);
@@ -81,22 +80,7 @@ export const DiagramRoom = () => {
   const aiAnalysisResult = useUIStore((state) => state.aiAnalysisResult);
   const setAiAnalysisResult = useUIStore((state) => state.setAiAnalysisResult);
 
-  // Keyboard shortcuts (Excalidraw-style)
-  useEffect(() => {
-    if (!canvas) return;
-    const onKey = (e) => {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-      const map = { v: 'select', h: 'hand', r: 'rect', d: 'diamond', e: 'circle', a: 'arrow', l: 'line', p: 'pen', t: 'text' };
-      if (map[e.key.toLowerCase()]) setActiveTool(map[e.key.toLowerCase()]);
-      if (e.key === 'Delete' || e.key === 'Backspace') {
-        const obj = canvas.getActiveObject();
-        if (obj) { canvas.remove(obj); canvas.requestRenderAll(); }
-      }
-      if (e.key === 'Escape') setActiveTool('select');
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [canvas]);
+  useCanvasTools({ canvas, setActiveTool });
 
   // Load diagram metadata
   useEffect(() => {
@@ -104,8 +88,10 @@ export const DiagramRoom = () => {
     const fetchDiagram = async () => {
       try {
         const diagram = await getDiagram(id);
+        const diagramId = diagram?._id ?? diagram?.id ?? id;
+        const diagramName = diagram?.name ?? 'Untitled Diagram';
         if (active) {
-          setActiveDiagram(diagram.id, diagram.name);
+          setActiveDiagram(diagramId, diagramName);
           setCollaborators(diagram.members ?? []);
           setLoading(false);
         }
@@ -146,7 +132,7 @@ export const DiagramRoom = () => {
   const activeObject = activeElementId && canvas
     ? canvas.getObjects().find((o) => o.id === activeElementId)
     : null;
-  const activeUserIds = Object.keys(cursors);
+  const activeUserIds = Object.keys(remoteCursors ?? {});
 
   return (
     <main style={{ width:'100vw', height:'100vh', position:'relative', overflow:'hidden', fontFamily:'sans-serif', background:'#f8f9fa' }}>
@@ -157,10 +143,10 @@ export const DiagramRoom = () => {
       <UserAvatarStack activeUserIds={activeUserIds} members={collaborators} />
 
       {/* Remote cursor overlay */}
-      <CursorOverlay cursors={cursors} canvas={canvas} />
+      <CursorOverlay cursors={remoteCursors} canvas={canvas} />
 
       {/* Full-screen canvas */}
-      <Canvas canvasRef={canvasRef} containerRef={containerRef} />
+      <CanvasViewport canvasRef={canvasRef} containerRef={containerRef} />
 
       {/* Bottom-left zoom controls */}
       <ZoomControls canvas={canvas} />

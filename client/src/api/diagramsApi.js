@@ -1,4 +1,4 @@
-import api from './api';
+import api from "./index";
 
 export const getDiagrams = async () => {
   const { data } = await api.get('/diagrams');

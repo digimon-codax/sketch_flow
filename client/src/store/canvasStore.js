@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
 export const useCanvasStore = create((set) => ({
-  // The selected Excalidraw element ID (string)
+  // Selected canvas element ID
   selectedElementId: null,
   setSelectedElementId: (id) => set({ selectedElementId: id }),
 

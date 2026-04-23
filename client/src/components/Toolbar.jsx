@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import * as fabric from 'fabric';
 import { cleanupLayout, assistArchitecture } from '../api/aiApi';
 import { useUIStore } from '../store/uiStore';
@@ -131,14 +131,13 @@ export const Toolbar = ({ canvas, activeTool, setActiveTool }) => {
     }
   }, [canvas, setActiveTool]);
 
-  const addShape = useCallback((type) => {
+  const addShape = useCallback((type, point) => {
     if (!canvas) return;
-    const center = canvas.getVpCenter();
-    const offset = () => (Math.random() * 60 - 30);
+    const center = point ?? canvas.getCenterPoint();
 
     const commonProps = {
-      left: center.x + offset(),
-      top:  center.y + offset(),
+      left: center.x,
+      top:  center.y,
       fill: 'transparent',
       stroke: '#1e1e1e',
       strokeWidth: 2,
@@ -160,22 +159,22 @@ export const Toolbar = ({ canvas, activeTool, setActiveTool }) => {
     } else if (type === 'circle') {
       shape = new fabric.Ellipse({ ...commonProps, rx: 70, ry: 45 });
     } else if (type === 'arrow') {
-      const cx = center.x + offset();
-      const cy = center.y + offset();
+      const cx = center.x;
+      const cy = center.y;
       shape = new fabric.Line([cx - 60, cy, cx + 60, cy], {
         ...commonProps, left: undefined, top: undefined,
         stroke: '#1e1e1e', strokeWidth: 2,
       });
     } else if (type === 'line') {
-      const cx = center.x + offset();
-      const cy = center.y + offset();
+      const cx = center.x;
+      const cy = center.y;
       shape = new fabric.Line([cx - 60, cy, cx + 60, cy], {
         ...commonProps, left: undefined, top: undefined,
       });
     } else if (type === 'text') {
       shape = new fabric.IText('Text', {
-        left: center.x + offset(),
-        top: center.y + offset(),
+        left: center.x,
+        top: center.y,
         fontFamily: 'Segoe UI, sans-serif',
         fontSize: 20,
         fill: '#1e1e1e',
@@ -194,20 +193,31 @@ export const Toolbar = ({ canvas, activeTool, setActiveTool }) => {
     handleToolSelect('select');
   }, [canvas, handleToolSelect]);
 
-  // Wire canvas mouse:down to place shapes for shape tools
-  const handleCanvasClick = useCallback((toolId) => {
-    if (['rect','diamond','circle','arrow','line','text'].includes(toolId)) {
-      addShape(toolId);
-    }
-  }, [addShape]);
+  const placeableTools = ['rect','diamond','circle','arrow','line','text'];
 
-  // Connect tool click → shape placement for non-select tools
+  useEffect(() => {
+    if (!canvas) return;
+
+    const onMouseDown = (opt) => {
+      if (activeTool === 'eraser' && opt.target) {
+        canvas.remove(opt.target);
+        canvas.requestRenderAll();
+        return;
+      }
+
+      if (!placeableTools.includes(activeTool)) return;
+
+      const point = opt.pointer ?? canvas.getCenterPoint();
+      addShape(activeTool, point);
+    };
+
+    canvas.on('mouse:down', onMouseDown);
+    return () => canvas.off('mouse:down', onMouseDown);
+  }, [canvas, activeTool, addShape]);
+
+  // Connect tool click to canvas mode changes
   const onToolClick = (toolId) => {
     handleToolSelect(toolId);
-    // For shape tools, immediately add at center
-    if (['rect','diamond','circle','arrow','line','text'].includes(toolId)) {
-      addShape(toolId);
-    }
   };
 
   const handleCleanUp = async () => {

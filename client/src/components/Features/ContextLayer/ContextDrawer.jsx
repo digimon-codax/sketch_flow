@@ -60,12 +60,16 @@ export default function ContextDrawer({ diagramId, api: excalidrawAPI }) {
           right:        0, top: 0,
           height:       "100vh",
           width:        320,
-          background:   "#fff",
-          boxShadow:    "-4px 0 24px rgba(0,0,0,0.08)",
+          background:   "rgba(255, 255, 255, 0.70)",
+          backdropFilter: "blur(24px)",
+          WebkitBackdropFilter: "blur(24px)",
+          borderLeft:   "1px solid rgba(255, 255, 255, 0.5)",
+          boxShadow:    "-8px 0 32px rgba(105, 101, 219, 0.15)",
           zIndex:       900,
           display:      "flex",
           flexDirection:"column",
           fontFamily:   "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+          transition:   "all 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
         }}
         onClick={(e) => e.stopPropagation()} // don't close on inner clicks
       >
