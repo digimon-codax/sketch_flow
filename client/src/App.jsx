@@ -4,6 +4,8 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import Dashboard from './pages/Dashboard';
 
+import CanvasPage from './pages/CanvasPage';
+
 // Simple auth wrapper
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem('sf_token');
@@ -56,7 +58,7 @@ function AppRoutes() {
         path="/canvas/:id" 
         element={
           <ProtectedRoute>
-            <div style={{ padding: 20 }}>Canvas Placeholder - Authenticated</div>
+            <CanvasPage />
           </ProtectedRoute>
         } 
       />
