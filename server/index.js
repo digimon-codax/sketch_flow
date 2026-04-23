@@ -6,6 +6,7 @@ import mongoose from "mongoose";
 
 import authRoutes from "./routes/auth.js";
 import diagramRoutes from "./routes/diagrams.js";
+import aiRoutes from "./routes/ai.js";
 import { initWSServer } from "./ws/wsServer.js";
 
 const app = express();
@@ -18,6 +19,7 @@ app.use(express.json({ limit: "20mb" }));
 // ── Routes ─────────────────────────────────────────────────────────────────
 app.use("/api/auth", authRoutes);
 app.use("/api/diagrams", diagramRoutes);
+app.use("/api/ai", aiRoutes);
 
 // ── Health check ───────────────────────────────────────────────────────────
 app.get("/api/health", (_req, res) => res.json({ status: "ok" }));
