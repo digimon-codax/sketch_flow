@@ -53,14 +53,15 @@ export const useCanvas = (diagramId, loading) => {
       preserveObjectStacking: true,
     });
 
-    // High-performance Dot Grid Pattern (no heavy loop needed!)
+    // Excalidraw-style dot grid
     const bgCanvas = document.createElement('canvas');
     bgCanvas.width = 20;
     bgCanvas.height = 20;
     const bgCtx = bgCanvas.getContext('2d');
-    bgCtx.fillStyle = '#c8d0e0';
+    bgCtx.clearRect(0, 0, 20, 20);
+    bgCtx.fillStyle = '#adb5c7';
     bgCtx.beginPath();
-    bgCtx.arc(10, 10, 1.5, 0, Math.PI * 2);
+    bgCtx.arc(10, 10, 1.2, 0, Math.PI * 2);
     bgCtx.fill();
 
     initCanvas.backgroundColor = new fabric.Pattern({
