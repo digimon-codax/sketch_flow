@@ -149,7 +149,7 @@ function makeControl(pointName, color) {
   });
 }
 
-function setupCurveControls(shape) {
+export function setupCurveControls(shape) {
   shape.controls = {
     p1: makeControl('p1', '#3498db'),
     cp: makeControl('cp', '#d4a853'),

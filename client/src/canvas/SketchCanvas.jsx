@@ -2,13 +2,24 @@ import React, { useEffect, useRef, useState } from 'react';
 import { initEngine } from './engine';
 import { useCanvasStore } from '../store/canvasStore';
 import { drawRect, drawEllipse, drawDiamond, drawArrow, drawLine, drawText, startFreehand, endFreehand } from './tools';
+import api from '../api';
+import { createHistory } from './history';
+import { serializeCanvas, deserializeCanvas } from './serialize';
 
 export const CanvasContext = React.createContext(null);
 
-export default function SketchCanvas({ setFabricCanvasRef }) {
+export default function SketchCanvas({ 
+  diagramId, 
+  initialElements, 
+  setSaveState, 
+  setHistoryRef, 
+  setFabricCanvasRef 
+}) {
   const containerRef = useRef(null);
   const canvasRef = useRef(null);
   const fcRef = useRef(null);
+  const historyRef = useRef(createHistory());
+  const saveTimeoutRef = useRef(null);
 
   useEffect(() => {
     if (!containerRef.current || !canvasRef.current) return;
@@ -22,6 +33,53 @@ export default function SketchCanvas({ setFabricCanvasRef }) {
     if (setFabricCanvasRef) {
       setFabricCanvasRef(fcRef);
     }
+    if (setHistoryRef) {
+      setHistoryRef(historyRef.current);
+    }
+
+    // Load initial elements if they exist
+    if (initialElements && initialElements.length > 0) {
+      deserializeCanvas(fc, initialElements);
+    }
+
+    const triggerSave = () => {
+      if (!diagramId) return;
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      if (setSaveState) setSaveState('saving');
+      
+      saveTimeoutRef.current = setTimeout(async () => {
+        try {
+          const elements = serializeCanvas(fc);
+          await api.patch(`/diagrams/${diagramId}`, { elements });
+          if (setSaveState) {
+            setSaveState('saved');
+            setTimeout(() => setSaveState(''), 2000);
+          }
+        } catch (err) {
+          console.error('Failed to autosave', err);
+        }
+      }, 5000);
+    };
+
+    const handleSnapshot = () => {
+      historyRef.current.snapshot(() => serializeCanvas(fc));
+      triggerSave();
+    };
+
+    let debounceSnap = null;
+    const snapDebounced = () => {
+      if (debounceSnap) clearTimeout(debounceSnap);
+      debounceSnap = setTimeout(handleSnapshot, 100);
+    };
+
+    // Listen to changes
+    fc.on('object:added', snapDebounced);
+    fc.on('object:modified', snapDebounced);
+    fc.on('object:removed', snapDebounced);
+    fc.on('path:created', snapDebounced);
+
+    // Initial snapshot
+    handleSnapshot();
 
     let isDrawing = false;
     let startPos = null;
@@ -153,12 +211,21 @@ export default function SketchCanvas({ setFabricCanvasRef }) {
 
     return () => {
       window.removeEventListener('resize', handleResize);
+      
+      fc.off('object:added', snapDebounced);
+      fc.off('object:modified', snapDebounced);
+      fc.off('object:removed', snapDebounced);
+      fc.off('path:created', snapDebounced);
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      if (debounceSnap) clearTimeout(debounceSnap);
+      
       if (fcRef.current) {
         fcRef.current.dispose();
         fcRef.current = null;
       }
     };
-  }, [setFabricCanvasRef]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [diagramId]);
 
   // Subscribe to tool changes to handle pencil mode
   useEffect(() => {

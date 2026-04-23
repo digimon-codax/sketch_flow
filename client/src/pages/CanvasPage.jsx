@@ -6,8 +6,9 @@ import SketchCanvas, { CanvasContext } from '../canvas/SketchCanvas';
 import { useCanvasStore } from '../store/canvasStore';
 import LeftToolbar from '../components/LeftToolbar/LeftToolbar';
 import PropertiesPanel from '../components/PropertiesPanel/PropertiesPanel';
+import { deserializeCanvas } from '../canvas/serialize';
 
-function TopBar({ diagramId, diagramName }) {
+function TopBar({ diagramId, diagramName, saveState }) {
   return (
     <div style={{ 
       height: '48px', 
@@ -17,9 +18,15 @@ function TopBar({ diagramId, diagramName }) {
       alignItems: 'center',
       padding: '0 16px',
       color: 'var(--text-primary)',
-      fontWeight: '500'
+      fontWeight: '500',
+      justifyContent: 'space-between'
     }}>
-      {diagramName || 'Loading...'}
+      <div>{diagramName || 'Loading...'}</div>
+      {saveState && (
+        <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+          {saveState === 'saving' ? 'Saving...' : 'Saved'}
+        </div>
+      )}
     </div>
   );
 }
@@ -29,7 +36,9 @@ export default function CanvasPage() {
   const [diagram, setDiagram] = useState(null);
   const [loading, setLoading] = useState(true);
   const [canvasReady, setCanvasReady] = useState(false);
+  const [saveState, setSaveState] = useState(''); // 'saving' | 'saved' | ''
   const fabricCanvasRef = useRef(null);
+  const historyRef = useRef(null); // Will be populated by SketchCanvas
 
   useEffect(() => {
     let isMounted = true;
@@ -39,6 +48,8 @@ export default function CanvasPage() {
         const res = await api.get(`/diagrams/${id}`);
         if (isMounted) {
           setDiagram(res.data);
+          // If the diagram has elements, we should deserialize them once the canvas is ready.
+          // This will be handled by passing diagram.elements to SketchCanvas.
         }
       } catch (err) {
         console.error('Failed to load diagram', err);
@@ -72,6 +83,24 @@ export default function CanvasPage() {
         case 'p': setActiveTool('pencil'); break;
         case 't': setActiveTool('text'); break;
         case 'h': setActiveTool('hand'); break;
+        case 'z':
+        case 'Z':
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            if (e.shiftKey) {
+              historyRef.current?.redo(els => deserializeCanvas(fc, els));
+            } else {
+              historyRef.current?.undo(els => deserializeCanvas(fc, els));
+            }
+          }
+          break;
+        case 'y':
+        case 'Y':
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            historyRef.current?.redo(els => deserializeCanvas(fc, els));
+          }
+          break;
         case 'Backspace':
         case 'Delete':
           if (fc) {
@@ -126,14 +155,20 @@ export default function CanvasPage() {
   return (
     <CanvasContext.Provider value={fabricCanvasRef}>
       <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--bg-base)', position: 'relative' }}>
-        <TopBar diagramId={diagram?._id} diagramName={diagram?.name} />
+        <TopBar diagramId={diagram?._id} diagramName={diagram?.name} saveState={saveState} />
         <PropertiesPanel canvasReady={canvasReady} />
         <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
           <LeftToolbar />
-          <SketchCanvas setFabricCanvasRef={(ref) => { 
-            fabricCanvasRef.current = ref.current; 
-            setCanvasReady(true);
-          }} />
+          <SketchCanvas 
+            diagramId={id}
+            initialElements={diagram?.elements}
+            setSaveState={setSaveState}
+            setHistoryRef={(h) => historyRef.current = h}
+            setFabricCanvasRef={(ref) => { 
+              fabricCanvasRef.current = ref.current; 
+              setCanvasReady(true);
+            }} 
+          />
         </div>
       </div>
     </CanvasContext.Provider>
