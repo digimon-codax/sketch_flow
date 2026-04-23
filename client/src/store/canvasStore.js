@@ -16,4 +16,17 @@ export const useCanvasStore = create((set) => ({
   setFillColor: (color) => set({ fillColor: color }),
   setStrokeWidth: (width) => set({ strokeWidth: width }),
   setStrokeStyle: (style) => set({ strokeStyle: style }),
+
+  remoteCursors: {},
+  updateRemoteCursor: (userId, data) => set((state) => ({
+    remoteCursors: { ...state.remoteCursors, [userId]: data }
+  })),
+  removeRemoteCursor: (userId) => set((state) => {
+    const newCursors = { ...state.remoteCursors };
+    delete newCursors[userId];
+    return { remoteCursors: newCursors };
+  }),
+
+  roomUsers: [],
+  setRoomUsers: (users) => set({ roomUsers: users }),
 }));
