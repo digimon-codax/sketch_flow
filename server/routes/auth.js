@@ -1,42 +1,4 @@
-import { Router } from 'express';
-import { registerUser, loginUser } from '../services/authService.js';
-
+import { Router } from "express";
 const router = Router();
-
-router.post('/register', async (req, res) => {
-  try {
-    const { name, email, password } = req.body;
-    if (!name || !email || !password) {
-      return res.status(400).json({ error: 'Name, email, and password are required' });
-    }
-
-    const data = await registerUser(name, email, password);
-    res.status(201).json(data);
-  } catch (error) {
-    if (error.message === 'Email already in use' || error.code === 'P2002') {
-      return res.status(409).json({ error: 'Email already in use' });
-    }
-    console.error('[/api/auth/register] Error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-router.post('/login', async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password are required' });
-    }
-
-    const data = await loginUser(email, password);
-    res.json(data);
-  } catch (error) {
-    if (error.message === 'Invalid credentials') {
-      return res.status(401).json({ error: error.message });
-    }
-    console.error('[/api/auth/login] Error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
+// TODO: implemented in Step 4
 export default router;
