@@ -1,15 +1,19 @@
-import { create } from "zustand";
+import { create } from 'zustand';
 
 export const useCanvasStore = create((set) => ({
-  // Selected canvas element ID
-  selectedElementId: null,
-  setSelectedElementId: (id) => set({ selectedElementId: id }),
-
-  // Current scene elements (kept in sync for hooks that need them)
   elements: [],
-  setElements: (elements) => set({ elements }),
-
-  // Collaboration: list of connected users
-  collaborators: [],
-  setCollaborators: (collaborators) => set({ collaborators }),
+  setElements: (els) => set({ elements: els }),
+  
+  activeTool: 'select',
+  setActiveTool: (tool) => set({ activeTool: tool }),
+  
+  strokeColor: '#f0ede8',
+  fillColor: 'transparent',
+  strokeWidth: 1.5,
+  strokeStyle: 'solid',
+  
+  setStrokeColor: (color) => set({ strokeColor: color }),
+  setFillColor: (color) => set({ fillColor: color }),
+  setStrokeWidth: (width) => set({ strokeWidth: width }),
+  setStrokeStyle: (style) => set({ strokeStyle: style }),
 }));
