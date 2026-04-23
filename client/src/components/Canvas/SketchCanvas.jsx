@@ -1,7 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { Excalidraw } from "@excalidraw/excalidraw";
-import "@excalidraw/excalidraw/index.css";
 
 import { useCollaboration }  from "../../hooks/useCollaboration";
 import { useCanvasStore }    from "../../store/canvasStore";
