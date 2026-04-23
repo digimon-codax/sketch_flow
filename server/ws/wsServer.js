@@ -1,150 +1,144 @@
 import { WebSocketServer } from "ws";
-import jwt from "jsonwebtoken";
-import Diagram from "../models/Diagram.js";
 import { pub, sub } from "../services/redis.js";
-import { joinRoom, leaveRoom, getRoomUsers, getRoomSockets } from "./roomManager.js";
+import {
+  joinRoom,
+  leaveRoom,
+  getRoomUsers,
+  getRoomClients,
+} from "./roomManager.js";
+import Diagram from "../models/Diagram.js";
+
+function send(ws, data) {
+  if (ws.readyState === ws.OPEN) {
+    ws.send(JSON.stringify(data));
+  }
+}
+
+function broadcast(roomId, data, excludeUserId = null) {
+  const clients = getRoomClients(roomId);
+  for (const { userId, ws } of clients) {
+    if (excludeUserId && userId === excludeUserId) continue;
+    send(ws, data);
+  }
+}
 
 export function initWSServer(httpServer) {
-  const wss = new WebSocketServer({ server: httpServer, path: "/ws" });
+  const wss = new WebSocketServer({ server: httpServer });
+  console.log("🔌 WebSocket server initialized");
 
-  // ── Redis Pub/Sub fan-out ─────────────────────────────────────
-  // Forward Redis messages to every WS client in the room (except the sender)
-  sub.on("ready", () => {
-    sub.psubscribe("room:*", (err) => {
-      if (err) console.warn("[WS] Redis psubscribe failed:", err.message);
-    });
+  // ── Redis fan-out ─────────────────────────────────────────────────────────
+  // Subscribe to all room channels using pattern subscribe
+  sub.psubscribe("room:*", (err) => {
+    if (err) console.error("❌ psubscribe error:", err.message);
+    else console.log("✅ Redis sub listening on room:*");
   });
 
-  sub.on("pmessage", (_pattern, channel, message) => {
+  sub.on("pmessage", (_pattern, channel, rawMessage) => {
+    // channel format: "room:<roomId>"
     const roomId = channel.replace("room:", "");
-    let parsed;
-    try { parsed = JSON.parse(message); } catch { return; }
-
-    wss.clients.forEach((client) => {
-      if (
-        client.readyState === 1 &&      // OPEN
-        client.roomId  === roomId &&
-        client.userId  !== parsed.userId // don't echo to sender
-      ) {
-        client.send(message);
-      }
-    });
-  });
-
-  // ── Connection handler ────────────────────────────────────────
-  wss.on("connection", (ws, req) => {
-    // Authenticate via token in query string: ws://host/ws?token=xxx
-    const url   = new URL(req.url, "http://localhost");
-    const token = url.searchParams.get("token");
-
-    if (!token) { ws.close(4001, "No token"); return; }
-
-    let userId;
+    let msg;
     try {
-      const payload = jwt.verify(token, process.env.JWT_SECRET);
-      userId = payload.userId;
+      msg = JSON.parse(rawMessage);
     } catch {
-      ws.close(4001, "Invalid token");
       return;
     }
 
-    ws.userId = userId;
+    // Forward to everyone in the room EXCEPT the sender
+    const senderId = msg.userId ?? null;
+    broadcast(roomId, msg, senderId);
+  });
 
-    // ── Message handler ─────────────────────────────────────────
-    ws.on("message", async (data) => {
+  // ── WebSocket connections ─────────────────────────────────────────────────
+  wss.on("connection", (ws) => {
+    ws.roomId = null;
+    ws.userId = null;
+
+    ws.on("message", async (raw) => {
       let msg;
-      try { msg = JSON.parse(data); } catch { return; }
-
-      const { type, roomId, payload } = msg;
-
-      // ── JOIN_ROOM ─────────────────────────────────────────────
-      if (type === "JOIN_ROOM") {
-        ws.roomId = roomId;
-
-        // Verify the user is actually a member of this diagram
-        const diagram = await Diagram.findById(roomId).lean();
-        if (!diagram) { ws.send(JSON.stringify({ type: "ERROR", payload: "Diagram not found" })); return; }
-
-        const isMember = diagram.members.some(
-          (m) => m.userId.toString() === userId
-        );
-        if (!isMember) { ws.close(4003, "Access denied"); return; }
-
-        joinRoom(roomId, userId, ws, msg.userName || "Guest");
-
-        // Send current scene state to the joining user
-        ws.send(JSON.stringify({
-          type: "ROOM_STATE",
-          payload: diagram.excalidrawState ?? { elements: [], appState: {}, files: {} },
-        }));
-
-        // Broadcast updated user list to all in room
-        broadcastToRoom(wss, roomId, {
-          type: "USER_LIST",
-          payload: getRoomUsers(roomId),
-        });
+      try {
+        msg = JSON.parse(raw);
+      } catch {
+        return send(ws, { type: "ERROR", payload: { message: "Invalid JSON" } });
       }
 
-      // ── ELEMENTS_UPDATE ───────────────────────────────────────
-      // A user changed the canvas — fan-out via Redis so all server instances forward it
-      if (type === "ELEMENTS_UPDATE" && ws.roomId) {
-        const fullMsg = JSON.stringify({ ...msg, userId });
-        try {
-          await pub.publish(`room:${ws.roomId}`, fullMsg);
-        } catch {
-          // Redis unavailable — fall back to direct broadcast
-          broadcastToRoom(wss, ws.roomId, { ...msg, userId }, userId);
+      const { type, roomId, userId, payload = {} } = msg;
+
+      switch (type) {
+        // ── JOIN_ROOM ──────────────────────────────────────────────────────
+        case "JOIN_ROOM": {
+          ws.roomId = roomId;
+          ws.userId = userId;
+
+          joinRoom(roomId, userId, payload.name ?? "Anonymous", ws);
+
+          // Send current diagram state to the joining client only
+          try {
+            const diagram = await Diagram.findById(roomId);
+            if (diagram) {
+              send(ws, {
+                type: "ROOM_STATE",
+                payload: {
+                  elements: diagram.elements,
+                  appState: diagram.appState,
+                },
+              });
+            }
+          } catch (err) {
+            console.error("JOIN_ROOM diagram fetch error:", err.message);
+          }
+
+          // Broadcast updated user list to everyone in room (including joiner)
+          const users = getRoomUsers(roomId);
+          const clients = getRoomClients(roomId);
+          for (const { ws: clientWs } of clients) {
+            send(clientWs, { type: "USER_LIST", payload: users });
+          }
+          break;
         }
-      }
 
-      // ── CURSOR_MOVE ───────────────────────────────────────────
-      if (type === "CURSOR_MOVE" && ws.roomId) {
-        const fullMsg = JSON.stringify({ ...msg, userId });
-        try {
-          await pub.publish(`room:${ws.roomId}`, fullMsg);
-        } catch {
-          broadcastToRoom(wss, ws.roomId, { ...msg, userId }, userId);
+        // ── ELEMENTS_UPDATE ────────────────────────────────────────────────
+        case "ELEMENTS_UPDATE": {
+          if (!roomId) break;
+          pub.publish("room:" + roomId, JSON.stringify(msg));
+          break;
         }
-      }
 
-      // ── LEAVE_ROOM ────────────────────────────────────────────
-      if (type === "LEAVE_ROOM" && ws.roomId) {
-        leaveRoom(ws.roomId, userId);
-        broadcastToRoom(wss, ws.roomId, {
-          type: "USER_LIST",
-          payload: getRoomUsers(ws.roomId),
-        });
-        ws.roomId = null;
+        // ── CURSOR_MOVE ────────────────────────────────────────────────────
+        case "CURSOR_MOVE": {
+          if (!roomId) break;
+          pub.publish("room:" + roomId, JSON.stringify(msg));
+          break;
+        }
+
+        // ── LEAVE_ROOM ─────────────────────────────────────────────────────
+        case "LEAVE_ROOM": {
+          if (!roomId || !userId) break;
+          leaveRoom(roomId, userId);
+          const remaining = getRoomUsers(roomId);
+          broadcast(roomId, { type: "USER_LIST", payload: remaining });
+          ws.roomId = null;
+          ws.userId = null;
+          break;
+        }
+
+        default:
+          send(ws, { type: "ERROR", payload: { message: `Unknown type: ${type}` } });
       }
     });
 
-    // ── Disconnect ──────────────────────────────────────────────
+    // ── Disconnect cleanup ──────────────────────────────────────────────────
     ws.on("close", () => {
-      if (ws.roomId) {
-        leaveRoom(ws.roomId, userId);
-        broadcastToRoom(wss, ws.roomId, {
-          type: "USER_LIST",
-          payload: getRoomUsers(ws.roomId),
-        });
+      if (ws.roomId && ws.userId) {
+        leaveRoom(ws.roomId, ws.userId);
+        const remaining = getRoomUsers(ws.roomId);
+        broadcast(ws.roomId, { type: "USER_LIST", payload: remaining });
       }
     });
 
-    ws.on("error", (err) => console.warn("[WS] Socket error:", err.message));
+    ws.on("error", (err) => {
+      console.error("WS client error:", err.message);
+    });
   });
 
-  console.log("✅  WebSocket server initialised on /ws");
-}
-
-// ── Helpers ───────────────────────────────────────────────────
-function broadcastToRoom(wss, roomId, msg, excludeUserId = null) {
-  const str = typeof msg === "string" ? msg : JSON.stringify(msg);
-  wss.clients.forEach((client) => {
-    if (
-      client.readyState === 1 &&
-      client.roomId === roomId &&
-      client.userId !== excludeUserId
-    ) {
-      client.send(str);
-    }
-  });
+  return wss;
 }
