@@ -64,7 +64,14 @@ export default function SketchCanvas({ setFabricCanvasRef }) {
       cleanupPreview();
 
       const { strokeColor, strokeWidth, fillColor } = useCanvasStore.getState();
-      const opts = { stroke: strokeColor, strokeWidth, fill: fillColor, roughness: 1.2 };
+      const opts = { 
+        stroke: strokeColor, 
+        strokeWidth, 
+        roughness: 1.2 
+      };
+      if (fillColor && fillColor !== 'transparent') {
+        opts.fill = fillColor;
+      }
 
       // Generate preview without adding it properly to active object/etc
       // We will draw it directly. For tools, we need to handle negative width/height logic carefully.
@@ -106,7 +113,10 @@ export default function SketchCanvas({ setFabricCanvasRef }) {
 
       const activeTool = useCanvasStore.getState().activeTool;
       const { strokeColor, strokeWidth, fillColor } = useCanvasStore.getState();
-      const opts = { stroke: strokeColor, strokeWidth, fill: fillColor };
+      const opts = { stroke: strokeColor, strokeWidth };
+      if (fillColor && fillColor !== 'transparent') {
+        opts.fill = fillColor;
+      }
 
       // If moved distance is very small, treat as a click (abort drawing)
       if (Math.abs(w) < 5 && Math.abs(h) < 5) {

@@ -4,6 +4,8 @@ import { fabric } from 'fabric';
 import api from '../api';
 import SketchCanvas, { CanvasContext } from '../canvas/SketchCanvas';
 import { useCanvasStore } from '../store/canvasStore';
+import LeftToolbar from '../components/LeftToolbar/LeftToolbar';
+import PropertiesPanel from '../components/PropertiesPanel/PropertiesPanel';
 
 function TopBar({ diagramId, diagramName }) {
   return (
@@ -22,26 +24,11 @@ function TopBar({ diagramId, diagramName }) {
   );
 }
 
-function LeftToolbar() {
-  return (
-    <div style={{ 
-      width: '52px', 
-      background: 'var(--bg-surface)', 
-      borderRight: '1px solid var(--border)',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      paddingTop: '16px'
-    }}>
-      {/* Toolbar icons will go here */}
-    </div>
-  );
-}
-
 export default function CanvasPage() {
   const { id } = useParams();
   const [diagram, setDiagram] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [canvasReady, setCanvasReady] = useState(false);
   const fabricCanvasRef = useRef(null);
 
   useEffect(() => {
@@ -138,11 +125,15 @@ export default function CanvasPage() {
 
   return (
     <CanvasContext.Provider value={fabricCanvasRef}>
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--bg-base)' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--bg-base)', position: 'relative' }}>
         <TopBar diagramId={diagram?._id} diagramName={diagram?.name} />
+        <PropertiesPanel canvasReady={canvasReady} />
         <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
           <LeftToolbar />
-          <SketchCanvas setFabricCanvasRef={(ref) => { fabricCanvasRef.current = ref.current; }} />
+          <SketchCanvas setFabricCanvasRef={(ref) => { 
+            fabricCanvasRef.current = ref.current; 
+            setCanvasReady(true);
+          }} />
         </div>
       </div>
     </CanvasContext.Provider>

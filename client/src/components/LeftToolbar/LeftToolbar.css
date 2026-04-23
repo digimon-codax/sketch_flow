@@ -1,0 +1,75 @@
+.left-toolbar {
+  width: 52px;
+  height: 100%;
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 0;
+  gap: 4px;
+  z-index: 50;
+}
+
+.tool-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  position: relative;
+  background: transparent;
+  transition: all 0.1s ease;
+}
+
+.tool-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.tool-btn.active {
+  background: var(--accent-dim);
+  color: var(--accent);
+  border: 1px solid rgba(212, 168, 83, 0.3);
+}
+
+.tool-separator {
+  height: 4px;
+  border-top: 1px solid var(--border);
+  width: 28px;
+  margin: 4px 0;
+}
+
+/* Tooltip styles */
+.tool-tooltip {
+  position: absolute;
+  left: 44px;
+  white-space: nowrap;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
+  z-index: 1000;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(-5px);
+  transition: all 0.15s ease;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tool-btn:hover .tool-tooltip {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.tool-tooltip-key {
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--text-hint);
+  font-size: 10px;
+}
