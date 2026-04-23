@@ -1,153 +1,148 @@
-import { Router } from "express";
+import express from "express";
+import mongoose from "mongoose";
 import Diagram from "../models/Diagram.js";
 import { requireAuth } from "../middleware/auth.js";
 
-const router = Router();
+const router = express.Router();
 
-// All diagram routes require authentication
+// All routes require auth
 router.use(requireAuth);
 
-// ── GET /api/diagrams ─────────────────────────────────────────
-// List all diagrams the current user is a member of
+// Helper – check if a userId is in the members array
+function isMember(diagram, userId) {
+  return diagram.members.some(
+    (m) => m.userId.toString() === userId.toString()
+  );
+}
+
+// Helper – check if a userId is the owner
+function isOwner(diagram, userId) {
+  return diagram.members.some(
+    (m) => m.userId.toString() === userId.toString() && m.role === "owner"
+  );
+}
+
+// ── GET /api/diagrams ──────────────────────────────────────────────────────
+// Return all diagrams the requesting user is a member of
 router.get("/", async (req, res) => {
   try {
-    const diagrams = await Diagram.find({ "members.userId": req.userId })
-      .select("name members createdAt updatedAt") // don't return full excalidrawState in list
-      .sort({ updatedAt: -1 })
-      .lean();
+    const diagrams = await Diagram.find(
+      { "members.userId": req.userId },
+      { _id: 1, name: 1, createdAt: 1, updatedAt: 1, members: 1 }
+    ).sort({ updatedAt: -1 });
 
-    res.json(diagrams);
+    return res.json(diagrams);
   } catch (err) {
-    console.error("[GET /api/diagrams]", err);
-    res.status(500).json({ error: "Failed to fetch diagrams" });
+    console.error("GET /diagrams error:", err);
+    return res.status(500).json({ error: "Internal server error" });
   }
 });
 
-// ── POST /api/diagrams ────────────────────────────────────────
-// Create a new diagram (current user becomes owner)
+// ── POST /api/diagrams ─────────────────────────────────────────────────────
+// Create a new diagram; requesting user becomes the owner
 router.post("/", async (req, res) => {
   try {
-    const { name = "Untitled Diagram" } = req.body;
+    const { name } = req.body;
 
     const diagram = await Diagram.create({
-      name,
-      excalidrawState: { elements: [], appState: {}, files: {} },
+      name: name?.trim() || "Untitled Diagram",
+      elements: [],
+      appState: { panX: 0, panY: 0, zoom: 1 },
       members: [{ userId: req.userId, role: "owner" }],
     });
 
-    res.status(201).json(diagram);
+    return res.status(201).json(diagram);
   } catch (err) {
-    console.error("[POST /api/diagrams]", err);
-    res.status(500).json({ error: "Failed to create diagram" });
+    console.error("POST /diagrams error:", err);
+    return res.status(500).json({ error: "Internal server error" });
   }
 });
 
-// ── GET /api/diagrams/:id ─────────────────────────────────────
-// Get one diagram with its full Excalidraw state
+// ── GET /api/diagrams/:id ──────────────────────────────────────────────────
+// Return full diagram if user is a member
 router.get("/:id", async (req, res) => {
   try {
-    const diagram = await Diagram.findById(req.params.id)
-      .populate("members.userId", "name email")
-      .lean();
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(404).json({ error: "Diagram not found" });
+    }
 
-    if (!diagram) return res.status(404).json({ error: "Diagram not found" });
-
-    // Verify the requesting user is a member
-    const isMember = diagram.members.some(
-      (m) => m.userId?._id?.toString() === req.userId || m.userId?.toString() === req.userId
-    );
-    if (!isMember) return res.status(403).json({ error: "Access denied" });
-
-    res.json(diagram);
-  } catch (err) {
-    console.error("[GET /api/diagrams/:id]", err);
-    res.status(500).json({ error: "Failed to fetch diagram" });
-  }
-});
-
-// ── PATCH /api/diagrams/:id ───────────────────────────────────
-// Autosave — update name or excalidrawState
-router.patch("/:id", async (req, res) => {
-  try {
-    const { name, excalidrawState } = req.body;
-
-    // Only allow owner/editor to update
     const diagram = await Diagram.findById(req.params.id);
     if (!diagram) return res.status(404).json({ error: "Diagram not found" });
 
-    const member = diagram.members.find(
-      (m) => m.userId.toString() === req.userId
-    );
-    if (!member || member.role === "viewer") {
-      return res.status(403).json({ error: "Access denied" });
+    if (!isMember(diagram, req.userId)) {
+      return res.status(403).json({ error: "Forbidden" });
     }
 
-    // Apply updates
-    if (name !== undefined)              diagram.name             = name;
-    if (excalidrawState !== undefined)   diagram.excalidrawState  = excalidrawState;
-
-    await diagram.save();
-    res.json({ success: true, updatedAt: diagram.updatedAt });
+    return res.json({
+      _id: diagram._id,
+      name: diagram.name,
+      elements: diagram.elements,
+      appState: diagram.appState,
+      members: diagram.members,
+      createdAt: diagram.createdAt,
+      updatedAt: diagram.updatedAt,
+    });
   } catch (err) {
-    console.error("[PATCH /api/diagrams/:id]", err);
-    res.status(500).json({ error: "Failed to save diagram" });
+    console.error("GET /diagrams/:id error:", err);
+    return res.status(500).json({ error: "Internal server error" });
   }
 });
 
-// ── DELETE /api/diagrams/:id ──────────────────────────────────
+// ── PATCH /api/diagrams/:id ────────────────────────────────────────────────
+// Update name / elements / appState (only fields provided)
+router.patch("/:id", async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(404).json({ error: "Diagram not found" });
+    }
+
+    const diagram = await Diagram.findById(req.params.id);
+    if (!diagram) return res.status(404).json({ error: "Diagram not found" });
+
+    if (!isMember(diagram, req.userId)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const { name, elements, appState } = req.body;
+    const updates = {};
+    if (name !== undefined) updates.name = name.trim();
+    if (elements !== undefined) updates.elements = elements;
+    if (appState !== undefined) updates.appState = appState;
+
+    const updated = await Diagram.findByIdAndUpdate(
+      req.params.id,
+      { $set: updates },
+      { new: true }
+    );
+
+    return res.json(updated);
+  } catch (err) {
+    console.error("PATCH /diagrams/:id error:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── DELETE /api/diagrams/:id ───────────────────────────────────────────────
 // Only the owner can delete
 router.delete("/:id", async (req, res) => {
   try {
-    const diagram = await Diagram.findById(req.params.id);
-    if (!diagram) return res.status(404).json({ error: "Diagram not found" });
-
-    const member = diagram.members.find(
-      (m) => m.userId.toString() === req.userId
-    );
-    if (!member || member.role !== "owner") {
-      return res.status(403).json({ error: "Only the owner can delete this diagram" });
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(404).json({ error: "Diagram not found" });
     }
 
-    await diagram.deleteOne();
-    res.json({ success: true });
-  } catch (err) {
-    console.error("[DELETE /api/diagrams/:id]", err);
-    res.status(500).json({ error: "Failed to delete diagram" });
-  }
-});
-
-// ── POST /api/diagrams/:id/members ───────────────────────────
-// Add a collaborator by email
-router.post("/:id/members", async (req, res) => {
-  try {
-    const { email, role = "editor" } = req.body;
-
     const diagram = await Diagram.findById(req.params.id);
     if (!diagram) return res.status(404).json({ error: "Diagram not found" });
 
-    // Only owner can add members
-    const requester = diagram.members.find(
-      (m) => m.userId.toString() === req.userId && m.role === "owner"
-    );
-    if (!requester) return res.status(403).json({ error: "Only the owner can add members" });
+    if (!isOwner(diagram, req.userId)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
 
-    // Find the user to add
-    const { default: User } = await import("../models/User.js");
-    const newUser = await User.findOne({ email: email.toLowerCase() });
-    if (!newUser) return res.status(404).json({ error: "No user with that email" });
+    await Diagram.findByIdAndDelete(req.params.id);
 
-    // Don't add if already a member
-    const alreadyMember = diagram.members.some(
-      (m) => m.userId.toString() === newUser._id.toString()
-    );
-    if (alreadyMember) return res.status(409).json({ error: "User is already a member" });
-
-    diagram.members.push({ userId: newUser._id, role });
-    await diagram.save();
-    res.json({ success: true });
+    return res.json({ success: true });
   } catch (err) {
-    console.error("[POST /api/diagrams/:id/members]", err);
-    res.status(500).json({ error: "Failed to add member" });
+    console.error("DELETE /diagrams/:id error:", err);
+    return res.status(500).json({ error: "Internal server error" });
   }
 });
 

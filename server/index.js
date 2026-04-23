@@ -4,6 +4,7 @@ import cors from "cors";
 import mongoose from "mongoose";
 
 import authRoutes from "./routes/auth.js";
+import diagramRoutes from "./routes/diagrams.js";
 
 const app = express();
 
@@ -13,6 +14,7 @@ app.use(express.json({ limit: "20mb" }));
 
 // ── Routes ─────────────────────────────────────────────────────────────────
 app.use("/api/auth", authRoutes);
+app.use("/api/diagrams", diagramRoutes);
 
 // ── Health check ───────────────────────────────────────────────────────────
 app.get("/api/health", (_req, res) => res.json({ status: "ok" }));
