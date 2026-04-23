@@ -1,139 +1,117 @@
-import { Router }   from "express";
-import multer        from "multer";
-import path          from "path";
-import fs            from "fs";
-import { fileURLToPath } from "url";
-import { requireAuth }   from "../middleware/auth.js";
-import ContextItem        from "../models/ContextItem.js";
-import Diagram            from "../models/Diagram.js";
+import express from "express";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+import mongoose from "mongoose";
+import ContextItem from "../models/ContextItem.js";
+import { requireAuth } from "../middleware/auth.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const router    = Router();
+// Ensure uploads directory exists
+const uploadDir = "uploads/";
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
 
-// ── Local file storage (swap for S3 in prod) ─────────────────
-const uploadsDir = path.join(__dirname, "../uploads");
-if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, uploadsDir),
-  filename:    (_req, file, cb) => {
-    const unique = `${Date.now()}-${Math.round(Math.random() * 1e6)}`;
-    cb(null, `${unique}-${file.originalname}`);
-  },
-});
-
-const upload = multer({
-  storage,
-  limits: { fileSize: 20 * 1024 * 1024 }, // 20 MB per file
-});
+const upload = multer({ dest: uploadDir });
+const router = express.Router();
 
 router.use(requireAuth);
 
-// ── Helper: verify user is a diagram member ───────────────────
-async function assertMember(diagramId, userId, res) {
-  const diagram = await Diagram.findById(diagramId).lean();
-  if (!diagram) { res.status(404).json({ error: "Diagram not found" }); return false; }
-  const isMember = diagram.members.some((m) => m.userId.toString() === userId);
-  if (!isMember) { res.status(403).json({ error: "Access denied" }); return false; }
-  return true;
-}
-
-// ── GET /api/context/:diagramId/:elementId ────────────────────
-// Fetch context for a single Excalidraw element
+// ── GET /api/context/:diagramId/:elementId ──────────────────────────────────
 router.get("/:diagramId/:elementId", async (req, res) => {
-  const { diagramId, elementId } = req.params;
   try {
-    if (!(await assertMember(diagramId, req.userId, res))) return;
-
-    const item = await ContextItem.findOne({ diagramId, elementId }).lean();
-    // Return empty defaults if no context exists yet
-    res.json(item ?? {
-      notes:       "",
-      links:       [],
-      codeSnippet: "",
-      language:    "javascript",
-      files:       [],
-    });
-  } catch (err) {
-    console.error("[GET /api/context]", err);
-    res.status(500).json({ error: "Failed to fetch context" });
-  }
-});
-
-// ── PATCH /api/context/:diagramId/:elementId ──────────────────
-// Create or update context (upsert)
-router.patch("/:diagramId/:elementId", async (req, res) => {
-  const { diagramId, elementId } = req.params;
-  try {
-    if (!(await assertMember(diagramId, req.userId, res))) return;
-
-    const { notes, links, codeSnippet, language } = req.body;
-    const update = {};
-    if (notes       !== undefined) update.notes       = notes;
-    if (links       !== undefined) update.links       = links;
-    if (codeSnippet !== undefined) update.codeSnippet = codeSnippet;
-    if (language    !== undefined) update.language    = language;
-
-    const item = await ContextItem.findOneAndUpdate(
-      { diagramId, elementId },
-      { $set: update },
-      { upsert: true, new: true }
-    );
-    res.json(item);
-  } catch (err) {
-    console.error("[PATCH /api/context]", err);
-    res.status(500).json({ error: "Failed to save context" });
-  }
-});
-
-// ── POST /api/context/:diagramId/:elementId/files ─────────────
-// Upload a file attachment to an element
-router.post(
-  "/:diagramId/:elementId/files",
-  upload.single("file"),
-  async (req, res) => {
     const { diagramId, elementId } = req.params;
-    try {
-      if (!(await assertMember(diagramId, req.userId, res))) return;
-      if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+    const item = await ContextItem.findOne({ diagramId, elementId });
 
-      const { originalname, size, mimetype, filename } = req.file;
-      const fileEntry = {
-        name:     originalname,
-        url:      `/uploads/${filename}`,
-        size,
-        mimeType: mimetype,
-      };
-
-      const item = await ContextItem.findOneAndUpdate(
-        { diagramId, elementId },
-        { $push: { files: fileEntry } },
-        { upsert: true, new: true }
-      );
-      res.json(item);
-    } catch (err) {
-      console.error("[POST /api/context/files]", err);
-      res.status(500).json({ error: "File upload failed" });
+    if (!item) {
+      return res.json({
+        notes: "",
+        links: [],
+        codeSnippet: "",
+        language: "javascript",
+        files: [],
+      });
     }
-  }
-);
 
-// ── DELETE /api/context/:diagramId/:elementId/files/:fileId ───
-// Remove a single file attachment
-router.delete("/:diagramId/:elementId/files/:fileId", async (req, res) => {
-  const { diagramId, elementId, fileId } = req.params;
-  try {
-    if (!(await assertMember(diagramId, req.userId, res))) return;
-
-    // Pull the file sub-document out of the array
-    await ContextItem.findOneAndUpdate(
-      { diagramId, elementId },
-      { $pull: { files: { _id: fileId } } }
-    );
-    res.json({ success: true });
+    return res.json(item);
   } catch (err) {
-    console.error("[DELETE /api/context/files]", err);
-    res.status(500).json({ error: "Failed to delete file" });
+    console.error("GET /context error:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── PATCH /api/context/:diagramId/:elementId ────────────────────────────────
+router.patch("/:diagramId/:elementId", async (req, res) => {
+  try {
+    const { diagramId, elementId } = req.params;
+    const { notes, links, codeSnippet, language } = req.body;
+
+    const updates = {};
+    if (notes !== undefined) updates.notes = notes;
+    if (links !== undefined) updates.links = links;
+    if (codeSnippet !== undefined) updates.codeSnippet = codeSnippet;
+    if (language !== undefined) updates.language = language;
+
+    const updated = await ContextItem.findOneAndUpdate(
+      { diagramId, elementId },
+      { $set: updates },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    return res.json(updated);
+  } catch (err) {
+    console.error("PATCH /context error:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── POST /api/context/:diagramId/:elementId/files ───────────────────────────
+router.post("/:diagramId/:elementId/files", upload.single("file"), async (req, res) => {
+  try {
+    const { diagramId, elementId } = req.params;
+
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+
+    const fileEntry = {
+      name: req.file.originalname,
+      url: "/uploads/" + req.file.filename,
+      size: req.file.size,
+      mimeType: req.file.mimetype,
+    };
+
+    const updated = await ContextItem.findOneAndUpdate(
+      { diagramId, elementId },
+      { $push: { files: fileEntry } },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    return res.json(updated);
+  } catch (err) {
+    console.error("POST /context/files error:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── DELETE /api/context/:diagramId/:elementId/files/:fileId ─────────────────
+router.delete("/:diagramId/:elementId/files/:fileId", async (req, res) => {
+  try {
+    const { diagramId, elementId, fileId } = req.params;
+
+    const updated = await ContextItem.findOneAndUpdate(
+      { diagramId, elementId },
+      { $pull: { files: { _id: new mongoose.Types.ObjectId(fileId) } } },
+      { new: true }
+    );
+
+    // Note: To be fully complete, you might want to fs.unlink the physical file here
+    // based on the file url, but we'll stick to the requested behavior of pulling the doc.
+
+    return res.json({ success: true, updated });
+  } catch (err) {
+    console.error("DELETE /context/files error:", err);
+    return res.status(500).json({ error: "Internal server error" });
   }
 });
 

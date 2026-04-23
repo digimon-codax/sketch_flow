@@ -7,7 +7,13 @@ import mongoose from "mongoose";
 import authRoutes from "./routes/auth.js";
 import diagramRoutes from "./routes/diagrams.js";
 import aiRoutes from "./routes/ai.js";
+import contextRoutes from "./routes/context.js";
 import { initWSServer } from "./ws/wsServer.js";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const httpServer = createServer(app);
@@ -20,6 +26,9 @@ app.use(express.json({ limit: "20mb" }));
 app.use("/api/auth", authRoutes);
 app.use("/api/diagrams", diagramRoutes);
 app.use("/api/ai", aiRoutes);
+app.use("/api/context", contextRoutes);
+
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // ── Health check ───────────────────────────────────────────────────────────
 app.get("/api/health", (_req, res) => res.json({ status: "ok" }));

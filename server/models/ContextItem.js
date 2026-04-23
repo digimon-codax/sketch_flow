@@ -7,8 +7,7 @@ const fileSchema = new mongoose.Schema(
     size: { type: Number, required: true },
     mimeType: { type: String, required: true },
     uploadedAt: { type: Date, default: Date.now },
-  },
-  { _id: false }
+  }
 );
 
 const contextItemSchema = new mongoose.Schema(
