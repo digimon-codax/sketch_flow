@@ -99,7 +99,7 @@ export default function SketchCanvas() {
       <CollabCursors cursors={remoteCursors} />
 
       {/* Context Layer drawer (slides in when element selected) */}
-      <ContextDrawer diagramId={diagramId} />
+      <ContextDrawer diagramId={diagramId} api={excalidrawAPI} />
 
       {/* Arch Assist result panel (slides up from bottom) */}
       {assistResult && (

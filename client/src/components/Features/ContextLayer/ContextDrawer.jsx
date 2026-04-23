@@ -15,7 +15,7 @@ const TAB_ICONS = {
   files: "📎",
 };
 
-export default function ContextDrawer({ diagramId }) {
+export default function ContextDrawer({ diagramId, api: excalidrawAPI }) {
   const selectedElementId = useCanvasStore((s) => s.selectedElementId);
   const setSelectedElementId = useCanvasStore((s) => s.setSelectedElementId);
   const [activeTab, setActiveTab] = useState("notes");
@@ -53,16 +53,6 @@ export default function ContextDrawer({ diagramId }) {
 
   return (
     <>
-      {/* Backdrop (click away to close) */}
-      <div
-        onClick={() => setSelectedElementId(null)}
-        style={{
-          position:   "fixed", inset: 0,
-          background: "transparent",
-          zIndex:     800,
-        }}
-      />
-
       {/* Drawer */}
       <div
         style={{
@@ -97,7 +87,12 @@ export default function ContextDrawer({ diagramId }) {
             </div>
           </div>
           <button
-            onClick={() => setSelectedElementId(null)}
+            onClick={() => {
+              if (excalidrawAPI) {
+                excalidrawAPI.updateScene({ appState: { selectedElementIds: {} } });
+              }
+              setSelectedElementId(null);
+            }}
             style={{
               background: "none", border: "none", cursor: "pointer",
               color: "#999", fontSize: 16, padding: 4, lineHeight: 1,
