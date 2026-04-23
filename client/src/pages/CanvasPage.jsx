@@ -1,7 +1,9 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
+import { fabric } from 'fabric';
 import api from '../api';
 import SketchCanvas, { CanvasContext } from '../canvas/SketchCanvas';
+import { useCanvasStore } from '../store/canvasStore';
 
 function TopBar({ diagramId, diagramName }) {
   return (
@@ -64,6 +66,50 @@ export default function CanvasPage() {
       isMounted = false;
     };
   }, [id]);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Don't trigger if user is typing in an input or textarea
+      if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
+
+      const { setActiveTool } = useCanvasStore.getState();
+      const fc = fabricCanvasRef.current;
+
+      switch (e.key) {
+        case 'v': setActiveTool('select'); break;
+        case 'r': setActiveTool('rect'); break;
+        case 'e': setActiveTool('ellipse'); break;
+        case 'd': setActiveTool('diamond'); break;
+        case 'a': setActiveTool('arrow'); break;
+        case 'l': setActiveTool('line'); break;
+        case 'p': setActiveTool('pencil'); break;
+        case 't': setActiveTool('text'); break;
+        case 'h': setActiveTool('hand'); break;
+        case 'Backspace':
+        case 'Delete':
+          if (fc) {
+            const activeObjects = fc.getActiveObjects();
+            if (activeObjects.length) {
+              activeObjects.forEach(obj => fc.remove(obj));
+              fc.discardActiveObject();
+              fc.requestRenderAll();
+            }
+          }
+          break;
+        case 'a':
+        case 'A':
+          if ((e.ctrlKey || e.metaKey) && fc) {
+            e.preventDefault();
+            fc.setActiveObject(new fabric.ActiveSelection(fc.getObjects(), { canvas: fc }));
+            fc.requestRenderAll();
+          }
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   if (loading) {
     return (
