@@ -2,13 +2,13 @@ import mongoose from "mongoose";
 
 const fileSchema = new mongoose.Schema(
   {
-    name:       { type: String, required: true },
-    url:        { type: String, required: true }, // local path or S3 URL
-    size:       { type: Number },
-    mimeType:   { type: String },
+    name: { type: String, required: true },
+    url: { type: String, required: true },
+    size: { type: Number, required: true },
+    mimeType: { type: String, required: true },
     uploadedAt: { type: Date, default: Date.now },
   },
-  { _id: true } // keep _id so we can delete individual files
+  { _id: false }
 );
 
 const contextItemSchema = new mongoose.Schema(
@@ -18,20 +18,37 @@ const contextItemSchema = new mongoose.Schema(
       ref: "Diagram",
       required: true,
     },
-    // Excalidraw's own element UUID (string, not ObjectId)
-    elementId: { type: String, required: true },
-
-    // Feature 3 — Context Layer tabs
-    notes:       { type: String, default: "" },
-    links:       { type: [String], default: [] },
-    codeSnippet: { type: String, default: "" },
-    language:    { type: String, default: "javascript" },
-    files:       { type: [fileSchema], default: [] },
+    elementId: {
+      type: String,
+      required: true,
+    },
+    notes: {
+      type: String,
+      default: "",
+    },
+    links: {
+      type: [String],
+      default: [],
+    },
+    codeSnippet: {
+      type: String,
+      default: "",
+    },
+    language: {
+      type: String,
+      default: "javascript",
+    },
+    files: {
+      type: [fileSchema],
+      default: [],
+    },
   },
   { timestamps: true }
 );
 
-// One context document per (diagram, element) pair
+// Compound unique index — one context item per element per diagram
 contextItemSchema.index({ diagramId: 1, elementId: 1 }, { unique: true });
 
-export default mongoose.model("ContextItem", contextItemSchema);
+const ContextItem = mongoose.model("ContextItem", contextItemSchema);
+
+export default ContextItem;

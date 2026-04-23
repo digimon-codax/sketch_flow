@@ -2,31 +2,42 @@ import mongoose from "mongoose";
 
 const memberSchema = new mongoose.Schema(
   {
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-    role:   { type: String, enum: ["owner", "editor", "viewer"], default: "editor" },
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    role: {
+      type: String,
+      default: "editor",
+    },
   },
   { _id: false }
 );
 
 const diagramSchema = new mongoose.Schema(
   {
-    name: { type: String, required: true, trim: true, default: "Untitled Diagram" },
-
-    // Full Excalidraw scene state — elements, appState, files
-    excalidrawState: {
-      type: Object,
-      default: { elements: [], appState: {}, files: {} },
+    name: {
+      type: String,
+      required: true,
+      default: "Untitled Diagram",
     },
-
-    // Users with access to this diagram
-    members: { type: [memberSchema], default: [] },
+    elements: {
+      type: Array,
+      default: [],
+    },
+    appState: {
+      type: Object,
+      default: { panX: 0, panY: 0, zoom: 1 },
+    },
+    members: {
+      type: [memberSchema],
+      default: [],
+    },
   },
   { timestamps: true }
 );
 
-// Virtual: get the owner member
-diagramSchema.virtual("owner").get(function () {
-  return this.members.find((m) => m.role === "owner");
-});
+const Diagram = mongoose.model("Diagram", diagramSchema);
 
-export default mongoose.model("Diagram", diagramSchema);
+export default Diagram;
