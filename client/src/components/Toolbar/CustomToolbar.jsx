@@ -11,12 +11,14 @@ export default function CustomToolbar({ api: excalidrawAPI, diagramId }) {
       style={{
         display:        "flex",
         alignItems:     "center",
-        gap:            8,
-        padding:        "6px 8px",
-        background:     "#fff",
-        border:         "1px solid #e3e2fe",
-        borderRadius:   12,
-        boxShadow:      "0 2px 12px rgba(105,101,219,0.10)",
+        gap:            12,
+        padding:        "8px",
+        background:     "rgba(255, 255, 255, 0.75)",
+        backdropFilter: "blur(20px)",
+        WebkitBackdropFilter: "blur(20px)",
+        border:         "1px solid rgba(255, 255, 255, 0.5)",
+        borderRadius:   16,
+        boxShadow:      "0 8px 32px rgba(105, 101, 219, 0.15)",
         userSelect:     "none",
       }}
     >
@@ -28,22 +30,35 @@ export default function CustomToolbar({ api: excalidrawAPI, diagramId }) {
         style={{
           display:        "flex",
           alignItems:     "center",
-          gap:            6,
-          padding:        "6px 14px",
-          borderRadius:   8,
-          border:         "1px solid #e3e2fe",
-          background:     cleaning ? "#f1f0ff" : "#f8f7ff",
-          color:          "#6965db",
+          gap:            8,
+          padding:        "8px 16px",
+          borderRadius:   10,
+          border:         "1px solid rgba(105, 101, 219, 0.2)",
+          background:     cleaning ? "rgba(105, 101, 219, 0.1)" : "rgba(255, 255, 255, 0.6)",
+          color:          "#5b57c8",
           fontWeight:     600,
           fontSize:       13,
           cursor:         cleaning ? "wait" : "pointer",
-          transition:     "background 0.15s",
+          transition:     "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
           whiteSpace:     "nowrap",
+          boxShadow:      "0 2px 8px rgba(0,0,0,0.02)",
         }}
-        onMouseEnter={(e) => { if (!cleaning) e.currentTarget.style.background = "#e8e7ff"; }}
-        onMouseLeave={(e) => { if (!cleaning) e.currentTarget.style.background = "#f8f7ff"; }}
+        onMouseEnter={(e) => {
+          if (!cleaning) {
+            e.currentTarget.style.background = "rgba(105, 101, 219, 0.1)";
+            e.currentTarget.style.transform = "translateY(-1px)";
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (!cleaning) {
+            e.currentTarget.style.background = "rgba(255, 255, 255, 0.6)";
+            e.currentTarget.style.transform = "translateY(0)";
+          }
+        }}
+        onMouseDown={(e) => { if (!cleaning) e.currentTarget.style.transform = "translateY(1px)"; }}
+        onMouseUp={(e) => { if (!cleaning) e.currentTarget.style.transform = "translateY(-1px)"; }}
       >
-        <span style={{ fontSize: 15 }}>{cleaning ? "⏳" : "✨"}</span>
+        <span style={{ fontSize: 16 }}>{cleaning ? "⏳" : "✨"}</span>
         {cleaning ? "Cleaning…" : "Clean Up"}
       </button>
 
@@ -55,23 +70,36 @@ export default function CustomToolbar({ api: excalidrawAPI, diagramId }) {
         style={{
           display:        "flex",
           alignItems:     "center",
-          gap:            6,
-          padding:        "6px 14px",
-          borderRadius:   8,
+          gap:            8,
+          padding:        "8px 18px",
+          borderRadius:   10,
           border:         "none",
-          background:     analyzing ? "#4340b0" : "#6965db",
+          background:     analyzing ? "#4340b0" : "linear-gradient(135deg, #6965db 0%, #b258e6 100%)",
           color:          "#fff",
           fontWeight:     700,
           fontSize:       13,
+          letterSpacing:  "0.3px",
           cursor:         analyzing ? "wait" : "pointer",
-          transition:     "background 0.15s",
+          transition:     "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
           whiteSpace:     "nowrap",
-          boxShadow:      "0 2px 8px rgba(105,101,219,0.30)",
+          boxShadow:      "0 4px 16px rgba(105, 101, 219, 0.4)",
         }}
-        onMouseEnter={(e) => { if (!analyzing) e.currentTarget.style.background = "#4340b0"; }}
-        onMouseLeave={(e) => { if (!analyzing) e.currentTarget.style.background = "#6965db"; }}
+        onMouseEnter={(e) => {
+          if (!analyzing) {
+            e.currentTarget.style.boxShadow = "0 6px 20px rgba(105, 101, 219, 0.5)";
+            e.currentTarget.style.transform = "translateY(-1px)";
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (!analyzing) {
+            e.currentTarget.style.boxShadow = "0 4px 16px rgba(105, 101, 219, 0.4)";
+            e.currentTarget.style.transform = "translateY(0)";
+          }
+        }}
+        onMouseDown={(e) => { if (!analyzing) e.currentTarget.style.transform = "translateY(1px)"; }}
+        onMouseUp={(e) => { if (!analyzing) e.currentTarget.style.transform = "translateY(-1px)"; }}
       >
-        <span style={{ fontSize: 15 }}>{analyzing ? "⏳" : "🧠"}</span>
+        <span style={{ fontSize: 16 }}>{analyzing ? "⏳" : "🧠"}</span>
         {analyzing ? "Analyzing…" : "Arch Assist"}
       </button>
     </div>

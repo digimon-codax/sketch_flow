@@ -69,11 +69,49 @@ export default function SketchCanvas() {
     if (pointer) sendCursor({ x: pointer.x, y: pointer.y });
   }, [sendCursor]);
 
-  // Cleanup autosave on unmount
-  useEffect(() => () => clearTimeout(autosaveTimer.current), []);
+  // Force aggressive CSS overrides after mount to beat Excalidraw's dynamic styles
+  useEffect(() => {
+    const style = document.createElement("style");
+    style.innerHTML = `
+      .sketchflow-theme {
+        --color-primary: #6965db !important;
+        --color-primary-darker: #5b57c8 !important;
+        --color-primary-darkest: #4340b0 !important;
+        --color-primary-light: #e3e2fe !important;
+      }
+      .sketchflow-theme * {
+        --color-primary: #6965db !important;
+      }
+      /* Aggressively hide the Library button, Social links, and Help */
+      .sketchflow-theme [class*="library-button" i],
+      .sketchflow-theme [class*="LibraryButton" i],
+      .sketchflow-theme button[title*="Library" i],
+      .sketchflow-theme button[aria-label*="Library" i],
+      .sketchflow-theme a[href*="discord"],
+      .sketchflow-theme a[href*="github"],
+      .sketchflow-theme a[href*="twitter"],
+      .sketchflow-theme [class*="HelpDialog"] {
+        display: none !important;
+      }
+      /* Glassmorphism for toolbars using wildcard selectors */
+      .sketchflow-theme [class*="App-menu"],
+      .sketchflow-theme [class*="App-toolbar"] {
+        border-radius: 16px !important;
+        background: rgba(255, 255, 255, 0.85) !important;
+        backdrop-filter: blur(12px) !important;
+        border: 1px solid rgba(105, 101, 219, 0.2) !important;
+        box-shadow: 0 8px 32px rgba(105, 101, 219, 0.12) !important;
+      }
+    `;
+    document.head.appendChild(style);
+    return () => {
+      document.head.removeChild(style);
+      clearTimeout(autosaveTimer.current);
+    };
+  }, []);
 
   return (
-    <div style={{ width: "100vw", height: "100vh", position: "relative" }}>
+    <div className="sketchflow-theme" style={{ width: "100vw", height: "100vh", position: "relative" }}>
       <Excalidraw
         excalidrawAPI={(api) => setAPI(api)}
         onChange={handleChange}

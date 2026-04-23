@@ -11,8 +11,69 @@ html, body, #root {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
-/* Excalidraw fullscreen override */
-.excalidraw {
+/* SketchFlow Custom Excalidraw Theme */
+.sketchflow-theme .excalidraw {
   height: 100% !important;
   width: 100% !important;
+
+  /* Match SketchFlow primary brand color */
+  --color-primary: #6965db !important;
+  --color-primary-darker: #5b57c8 !important;
+  --color-primary-darkest: #4340b0 !important;
+  --color-primary-light: #e3e2fe !important;
+
+  /* Modern typography */
+  --ui-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+  
+  /* Softer rounded corners for UI elements */
+  --border-radius: 12px !important;
+
+  /* Modern floating shadows */
+  --shadow-island: 0 8px 32px rgba(105, 101, 219, 0.12) !important;
+}
+
+/* Glassmorphism for Top Toolbar & Left Tools */
+.sketchflow-theme .excalidraw .App-menu_top,
+.sketchflow-theme .excalidraw .App-toolbar {
+  border-radius: 16px !important;
+  border: 1px solid rgba(105, 101, 219, 0.2) !important;
+  background: rgba(255, 255, 255, 0.85) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  box-shadow: var(--shadow-island) !important;
+}
+
+/* Make tool buttons more rounded */
+.sketchflow-theme .excalidraw .ToolIcon__icon {
+  border-radius: 10px !important;
+}
+
+/* Hide Excalidraw's default Library button, Social buttons, and Help buttons to white-label it */
+.sketchflow-theme .excalidraw .layer-ui__wrapper footer .HelpDialogToggleButton,
+.sketchflow-theme .excalidraw .layer-ui__wrapper footer .discord-icon,
+.sketchflow-theme .excalidraw .layer-ui__wrapper footer .github-icon,
+.sketchflow-theme .excalidraw .layer-ui__library-button,
+.sketchflow-theme .excalidraw [class*="library-button"],
+.sketchflow-theme .excalidraw [class*="LibraryButton"] {
+  display: none !important;
+}
+
+/* Style the properties panel (stroke, color, etc) */
+.sketchflow-theme .excalidraw .properties-content {
+  background: rgba(255, 255, 255, 0.9) !important;
+  backdrop-filter: blur(12px) !important;
+  border-radius: 16px !important;
+  border: 1px solid rgba(105, 101, 219, 0.2) !important;
+  box-shadow: var(--shadow-island) !important;
+  padding: 12px !important;
+}
+
+/* Bottom corner actions (zoom, undo/redo) */
+.sketchflow-theme .excalidraw .layer-ui__wrapper .undo-redo-buttons,
+.sketchflow-theme .excalidraw .layer-ui__wrapper .zoom-actions {
+  background: rgba(255, 255, 255, 0.85) !important;
+  backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(105, 101, 219, 0.2) !important;
+  border-radius: 12px !important;
+  box-shadow: var(--shadow-island) !important;
 }
