@@ -1,16 +1,20 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { create } from "zustand";
 
-export const useAuthStore = create(
-  persist(
-    (set) => ({
-      user: null,
-      token: null,
-      setAuth: (user, token) => set({ user, token }),
-      logout: () => set({ user: null, token: null }),
-    }),
-    {
-      name: 'sketchflow-auth',
-    }
-  )
-);
+const stored = localStorage.getItem("sf_user");
+
+export const useAuthStore = create((set) => ({
+  user:  stored ? JSON.parse(stored) : null,
+  token: localStorage.getItem("sf_token") || null,
+
+  login(user, token) {
+    localStorage.setItem("sf_token", token);
+    localStorage.setItem("sf_user", JSON.stringify(user));
+    set({ user, token });
+  },
+
+  logout() {
+    localStorage.removeItem("sf_token");
+    localStorage.removeItem("sf_user");
+    set({ user: null, token: null });
+  },
+}));

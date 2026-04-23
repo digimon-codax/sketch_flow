@@ -1,11 +1,15 @@
-import { create } from 'zustand';
+import { create } from "zustand";
 
-export const useUIStore = create((set) => ({
-  activeElementId: null,
-  isContextPanelOpen: false,
-  aiAnalysisResult: null,
+export const useUiStore = create((set) => ({
+  // Feature 2 — Arch Assist result
+  assistResult: null,
+  setAssistResult: (result) => set({ assistResult: result }),
+  clearAssistResult: () => set({ assistResult: null }),
 
-  setActiveElement: (id) => set({ activeElementId: id, isContextPanelOpen: !!id }),
-  closeContextPanel: () => set({ isContextPanelOpen: false, activeElementId: null }),
-  setAiAnalysisResult: (result) => set({ aiAnalysisResult: result }),
+  // Toast / notification
+  toast: null,
+  showToast: (msg, type = "info") => {
+    set({ toast: { msg, type } });
+    setTimeout(() => set({ toast: null }), 3000);
+  },
 }));
