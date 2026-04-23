@@ -6,30 +6,8 @@ import SketchCanvas, { CanvasContext } from '../canvas/SketchCanvas';
 import { useCanvasStore } from '../store/canvasStore';
 import LeftToolbar from '../components/LeftToolbar/LeftToolbar';
 import PropertiesPanel from '../components/PropertiesPanel/PropertiesPanel';
+import TopBar from '../components/TopBar/TopBar';
 import { deserializeCanvas } from '../canvas/serialize';
-
-function TopBar({ diagramId, diagramName, saveState }) {
-  return (
-    <div style={{ 
-      height: '48px', 
-      background: 'var(--bg-surface)', 
-      borderBottom: '1px solid var(--border)',
-      display: 'flex',
-      alignItems: 'center',
-      padding: '0 16px',
-      color: 'var(--text-primary)',
-      fontWeight: '500',
-      justifyContent: 'space-between'
-    }}>
-      <div>{diagramName || 'Loading...'}</div>
-      {saveState && (
-        <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-          {saveState === 'saving' ? 'Saving...' : 'Saved'}
-        </div>
-      )}
-    </div>
-  );
-}
 
 export default function CanvasPage() {
   const { id } = useParams();
