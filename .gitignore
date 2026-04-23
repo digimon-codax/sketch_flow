@@ -5,10 +5,18 @@ server/node_modules/
 
 # Build outputs
 client/dist/
+server/dist/
 
 # Environment files — NEVER commit these
 .env
 server/.env
+client/.env
+
+# Uploads (local dev file storage)
+server/uploads/
+
+# Prisma (removed in v2)
+server/prisma/
 
 # Logs
 *.log
@@ -21,3 +29,6 @@ Thumbs.db
 # Editor
 .vscode/
 .idea/
+
+# Vite
+client/.vite/

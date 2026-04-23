@@ -1,22 +1,16 @@
-version: '3.8'
+version: "3.8"
 
 services:
-  mongodb:
-    image: mongo:latest
+  mongo:
+    image: mongo:7
     restart: unless-stopped
     ports:
       - "27017:27017"
     volumes:
-      - mongodb_data:/data/db
-    # MongoDB needs to be a replica set for Prisma to use transactions
-    command: ["--replSet", "rs0", "--bind_ip_all", "--port", "27017"]
-    healthcheck:
-      test: echo "try { rs.status() } catch (err) { rs.initiate({_id:'rs0',members:[{_id:0,host:'localhost:27017'}]}) }" | mongosh --port 27017 --quiet
-      interval: 5s
-      timeout: 30s
-      start_period: 0s
-      start_interval: 1s
-      retries: 30
+      - mongo_data:/data/db
+    # Simple standalone — Mongoose doesn't need a replica set
+    environment:
+      MONGO_INITDB_DATABASE: sketchflow
 
   redis:
     image: redis:7-alpine
@@ -28,5 +22,5 @@ services:
     command: redis-server --appendonly yes
 
 volumes:
-  mongodb_data:
+  mongo_data:
   redis_data:
