@@ -37,7 +37,17 @@ export function useCollaboration(fabricCanvasRef, diagramId, ws) {
     });
 
     ws.on('USER_LIST', msg => {
-      useCanvasStore.getState().setRoomUsers(msg.payload || []);
+      const users = msg.payload || [];
+      const store = useCanvasStore.getState();
+      store.setRoomUsers(users);
+      
+      // Clean up cursors for users who have left
+      const activeIds = users.map(u => u.userId);
+      Object.keys(store.remoteCursors).forEach(uid => {
+        if (!activeIds.includes(uid)) {
+          store.removeRemoteCursor(uid);
+        }
+      });
     });
 
     const fc = fabricCanvasRef.current;

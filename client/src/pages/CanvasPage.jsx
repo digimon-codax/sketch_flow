@@ -7,7 +7,10 @@ import { useCanvasStore } from '../store/canvasStore';
 import LeftToolbar from '../components/LeftToolbar/LeftToolbar';
 import PropertiesPanel from '../components/PropertiesPanel/PropertiesPanel';
 import TopBar from '../components/TopBar/TopBar';
+import CollabCursors from '../components/CollabCursors/CollabCursors';
 import { deserializeCanvas } from '../canvas/serialize';
+import { useWebSocket } from '../hooks/useWebSocket';
+import { useCollaboration } from '../hooks/useCollaboration';
 
 export default function CanvasPage() {
   const { id } = useParams();
@@ -17,6 +20,9 @@ export default function CanvasPage() {
   const [saveState, setSaveState] = useState(''); // 'saving' | 'saved' | ''
   const fabricCanvasRef = useRef(null);
   const historyRef = useRef(null); // Will be populated by SketchCanvas
+
+  const ws = useWebSocket(import.meta.env.VITE_WS_URL || 'ws://localhost:3001');
+  useCollaboration(fabricCanvasRef, id, ws);
 
   useEffect(() => {
     let isMounted = true;
@@ -135,6 +141,7 @@ export default function CanvasPage() {
       <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--bg-base)', position: 'relative' }}>
         <TopBar diagramId={diagram?._id} diagramName={diagram?.name} saveState={saveState} />
         <PropertiesPanel canvasReady={canvasReady} />
+        <CollabCursors />
         <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
           <LeftToolbar />
           <SketchCanvas 

@@ -19,7 +19,7 @@ export const useCanvasStore = create((set) => ({
 
   remoteCursors: {},
   updateRemoteCursor: (userId, data) => set((state) => ({
-    remoteCursors: { ...state.remoteCursors, [userId]: data }
+    remoteCursors: { ...state.remoteCursors, [userId]: { ...data, lastUpdate: Date.now() } }
   })),
   removeRemoteCursor: (userId) => set((state) => {
     const newCursors = { ...state.remoteCursors };
