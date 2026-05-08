@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { initEngine } from './engine';
 import { useCanvasStore } from '../store/canvasStore';
+import { useUIStore } from '../store/uiStore';
 import { drawRect, drawEllipse, drawDiamond, drawArrow, drawLine, drawText, startFreehand, endFreehand } from './tools';
 import api from '../api';
 import { createHistory } from './history';
@@ -80,6 +81,26 @@ export default function SketchCanvas({
 
     // Initial snapshot
     handleSnapshot();
+
+    fc.on('selection:created', e => {
+      if (e.selected && e.selected.length === 1 && e.selected[0].id) {
+        useUIStore.getState().setSelectedElementId(e.selected[0].id);
+        useUIStore.getState().setDrawerOpen(true);
+      }
+    });
+
+    fc.on('selection:updated', e => {
+      if (e.selected && e.selected.length === 1 && e.selected[0].id) {
+        useUIStore.getState().setSelectedElementId(e.selected[0].id);
+      } else {
+        useUIStore.getState().setSelectedElementId(null);
+      }
+    });
+
+    fc.on('selection:cleared', () => {
+      useUIStore.getState().setDrawerOpen(false);
+      useUIStore.getState().setSelectedElementId(null);
+    });
 
     let isDrawing = false;
     let startPos = null;

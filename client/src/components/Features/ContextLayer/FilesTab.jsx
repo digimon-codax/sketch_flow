@@ -1,127 +1,198 @@
-import { useCallback } from "react";
-import { useDropzone } from "react-dropzone";
-import api from "../../../api/index";
+import React, { useRef, useState } from 'react';
+import { Upload, ImageIcon, FileText, File, Download, Trash2 } from 'lucide-react';
+import api from '../../../api';
 
-function formatSize(bytes) {
-  if (!bytes) return "";
-  if (bytes < 1024)       return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-}
-
-function fileIcon(mimeType = "") {
-  if (mimeType.startsWith("image/")) return "🖼️";
-  if (mimeType === "application/pdf") return "📄";
-  if (mimeType.includes("zip") || mimeType.includes("tar")) return "🗜️";
-  return "📎";
+function formatFileSize(bytes) {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 }
 
 export default function FilesTab({ diagramId, elementId, files = [], onRefresh }) {
-  const onDrop = useCallback(async (acceptedFiles) => {
-    for (const file of acceptedFiles) {
-      const form = new FormData();
-      form.append("file", file);
-      try {
-        await api.post(`/context/${diagramId}/${elementId}/files`, form, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
-      } catch (err) {
-        console.error("Upload failed:", err.message);
-      }
+  const fileInputRef = useRef(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState('');
+
+  const uploadFile = async (file) => {
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      setError('File is too large (max 10MB)');
+      return;
     }
-    onRefresh();
-  }, [diagramId, elementId, onRefresh]);
+    
+    setError('');
+    setUploading(true);
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    try {
+      await api.post(`/context/${diagramId}/${elementId}/files`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      console.error(err);
+      setError('Upload failed');
+    } finally {
+      setUploading(false);
+    }
+  };
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    maxSize: 20 * 1024 * 1024, // 20 MB
-  });
+  const deleteFile = async (fileId) => {
+    try {
+      await api.delete(`/context/${diagramId}/${elementId}/files/${fileId}`);
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      console.error(err);
+      setError('Failed to delete file');
+    }
+  };
 
-  async function deleteFile(fileId) {
-    await api.delete(`/context/${diagramId}/${elementId}/files/${fileId}`);
-    onRefresh();
-  }
+  const getFileIcon = (mimeType) => {
+    if (mimeType?.startsWith('image/')) return <ImageIcon size={14} color="var(--text-secondary)" />;
+    if (mimeType === 'application/pdf' || mimeType?.startsWith('text/')) return <FileText size={14} color="var(--text-secondary)" />;
+    return <File size={14} color="var(--text-secondary)" />;
+  };
+
+  const getDownloadUrl = (url) => {
+    if (url?.startsWith('http')) return url;
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    return `${apiUrl}${url}`;
+  };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <label style={{ fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-        File Attachments
-      </label>
-
-      {/* Dropzone */}
-      <div
-        {...getRootProps()}
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <div 
+        onDragEnter={() => setIsDragging(true)}
+        onDragLeave={() => setIsDragging(false)}
+        onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+        onDrop={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setIsDragging(false);
+          const file = e.dataTransfer.files[0];
+          uploadFile(file);
+        }}
+        onClick={() => fileInputRef.current?.click()}
         style={{
-          border:        `2px dashed ${isDragActive ? "#6965db" : "#d8d7fe"}`,
-          borderRadius:  10,
-          padding:       "20px 16px",
-          textAlign:     "center",
-          cursor:        "pointer",
-          background:    isDragActive ? "#f0f0ff" : "#fafafa",
-          transition:    "all 0.15s",
+          border: `2px dashed ${isDragging ? 'var(--accent)' : 'var(--border)'}`,
+          backgroundColor: isDragging ? 'var(--accent-dim)' : 'transparent',
+          borderRadius: 'var(--radius-sm)',
+          padding: '20px',
+          textAlign: 'center',
+          cursor: 'pointer',
+          marginBottom: '12px',
+          transition: 'all var(--transition)'
         }}
       >
-        <input {...getInputProps()} />
-        <div style={{ fontSize: 28, marginBottom: 6 }}>📁</div>
-        <p style={{ fontSize: 12, color: isDragActive ? "#6965db" : "#aaa", margin: 0 }}>
-          {isDragActive
-            ? "Drop files here…"
-            : "Drag & drop files, or click to browse"}
-        </p>
-        <p style={{ fontSize: 11, color: "#ccc", marginTop: 4 }}>Max 20 MB per file</p>
+        <input 
+          type="file" 
+          ref={fileInputRef} 
+          style={{ display: 'none' }}
+          onChange={(e) => uploadFile(e.target.files[0])}
+        />
+        
+        {uploading ? (
+          <div style={{ padding: '4px 0' }}>
+            <div style={{
+              width: '20px',
+              height: '20px',
+              border: '2px solid var(--border)',
+              borderTopColor: 'var(--accent)',
+              borderRadius: '50%',
+              margin: '0 auto',
+              animation: 'spin 1s linear infinite'
+            }} />
+          </div>
+        ) : (
+          <>
+            <Upload size={20} color="var(--text-hint)" style={{ margin: '0 auto' }} />
+            <div style={{ fontSize: '12px', color: 'var(--text-hint)', marginTop: '6px' }}>
+              Drop a file or click to browse
+            </div>
+            <div style={{ fontSize: '10px', color: 'var(--text-hint)', marginTop: '4px' }}>
+              Max 10MB
+            </div>
+          </>
+        )}
       </div>
 
-      {/* File list */}
-      {files.length === 0 ? (
-        <p style={{ fontSize: 12, color: "#bbb", textAlign: "center" }}>No files yet</p>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {files.map((f) => (
-            <div
-              key={f._id}
-              style={{
-                display:      "flex",
-                alignItems:   "center",
-                gap:          10,
-                background:   "#f8f7ff",
-                border:       "1px solid #e3e2fe",
-                borderRadius: 7,
-                padding:      "8px 10px",
-              }}
-            >
-              <span style={{ fontSize: 18, flexShrink: 0 }}>{fileIcon(f.mimeType)}</span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <a
-                  href={f.url} target="_blank" rel="noreferrer"
-                  download={f.name}
-                  style={{
-                    fontSize:       12,
-                    fontWeight:     500,
-                    color:          "#6965db",
-                    textDecoration: "none",
-                    display:        "block",
-                    overflow:       "hidden",
-                    textOverflow:   "ellipsis",
-                    whiteSpace:     "nowrap",
-                  }}
-                  title={f.name}
-                >
-                  {f.name}
-                </a>
-                <span style={{ fontSize: 10, color: "#bbb" }}>{formatSize(f.size)}</span>
+      {error && <div style={{ color: 'var(--danger)', fontSize: '12px', marginBottom: '8px', textAlign: 'center' }}>{error}</div>}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        {files.length === 0 ? (
+           <div style={{ textAlign: 'center', color: 'var(--text-hint)', fontSize: '12px', marginTop: '10px' }}>
+              No files added
+           </div>
+        ) : (
+          files.map(f => (
+            <div key={f._id || f.id} style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '8px 10px',
+              background: 'var(--bg-elevated)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-sm)'
+            }}>
+              {getFileIcon(f.mimeType || f.type)}
+              <div style={{ flex: 1, overflow: 'hidden' }}>
+                <span style={{ 
+                  fontSize: '12px', 
+                  color: 'var(--text-primary)', 
+                  display: 'block',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis'
+                }}>
+                  {f.originalName || f.name}
+                </span>
+                <span style={{ fontSize: '10px', color: 'var(--text-hint)' }}>
+                  {formatFileSize(f.size)}
+                </span>
               </div>
-              <button
-                onClick={() => deleteFile(f._id)}
+              <a 
+                href={getDownloadUrl(f.url)} 
+                target="_blank" 
+                rel="noopener noreferrer"
                 style={{
-                  background: "none", border: "none", cursor: "pointer",
-                  color: "#ccc", fontSize: 14, lineHeight: 1, padding: 0, flexShrink: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '2px',
+                  color: 'var(--text-secondary)'
                 }}
-                title="Remove"
-              >✕</button>
+              >
+                <Download size={14} 
+                  onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-primary)'}
+                  onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
+                />
+              </a>
+              <button 
+                onClick={() => deleteFile(f._id || f.id)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '2px'
+                }}
+              >
+                <Trash2 size={14} color="var(--text-secondary)" 
+                  onMouseEnter={(e) => e.currentTarget.style.color = 'var(--danger)'}
+                  onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
+                />
+              </button>
             </div>
-          ))}
-        </div>
-      )}
+          ))
+        )}
+      </div>
     </div>
   );
 }

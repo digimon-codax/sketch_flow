@@ -8,6 +8,7 @@ import LeftToolbar from '../components/LeftToolbar/LeftToolbar';
 import PropertiesPanel from '../components/PropertiesPanel/PropertiesPanel';
 import TopBar from '../components/TopBar/TopBar';
 import CollabCursors from '../components/CollabCursors/CollabCursors';
+import ContextDrawer from '../components/Features/ContextLayer/ContextDrawer';
 import { deserializeCanvas } from '../canvas/serialize';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { useCollaboration } from '../hooks/useCollaboration';
@@ -96,7 +97,6 @@ export default function CanvasPage() {
             }
           }
           break;
-        case 'a':
         case 'A':
           if ((e.ctrlKey || e.metaKey) && fc) {
             e.preventDefault();
@@ -142,6 +142,7 @@ export default function CanvasPage() {
         <TopBar diagramId={diagram?._id} diagramName={diagram?.name} saveState={saveState} />
         <PropertiesPanel canvasReady={canvasReady} />
         <CollabCursors />
+        <ContextDrawer diagramId={id} />
         <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
           <LeftToolbar />
           <SketchCanvas 

@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { useCanvasStore } from "../../../store/canvasStore";
+import React, { useState, useEffect } from "react";
+import { useUIStore } from "../../../store/uiStore";
 import api from "../../../api/index";
 import NotesTab from "./NotesTab";
 import LinksTab from "./LinksTab";
@@ -16,40 +16,51 @@ const TAB_ICONS = {
 };
 
 export default function ContextDrawer({ diagramId, api: excalidrawAPI }) {
-  const selectedElementId = useCanvasStore((s) => s.selectedElementId);
-  const setSelectedElementId = useCanvasStore((s) => s.setSelectedElementId);
-  const [activeTab, setActiveTab] = useState("notes");
-  const [context,   setContext]   = useState(null);
-  const [loading,   setLoading]   = useState(false);
+  const selectedElementId = useUIStore((s) => s.selectedElementId);
+  const setSelectedElementId = useUIStore((s) => s.setSelectedElementId);
+  const drawerOpen = useUIStore((s) => s.drawerOpen);
+  const setDrawerOpen = useUIStore((s) => s.setDrawerOpen);
 
-  // Fetch context whenever a new element is selected
+  const [activeTab, setActiveTab] = useState("notes");
+  const [context, setContext] = useState(null);
+  const [loading, setLoading] = useState(false);
+
   useEffect(() => {
-    if (!selectedElementId) { setContext(null); return; }
+    if (!selectedElementId) { 
+      setContext(null); 
+      return; 
+    }
     setLoading(true);
-    api
-      .get(`/context/${diagramId}/${selectedElementId}`)
-      .then((r) => setContext(r.data))
-      .catch(console.error)
+    // GET /api/context/:diagramId/:elementId
+    api.get(`/context/${diagramId}/${selectedElementId}`)
+      .then((r) => {
+        setContext(r.data);
+      })
+      .catch((err) => {
+        // If 404 or empty, set default
+        setContext({ notes: '', links: [], codeSnippet: '', language: 'javascript', files: [] });
+      })
       .finally(() => setLoading(false));
   }, [selectedElementId, diagramId]);
 
-  function save(patch) {
+  async function patchContext(patch) {
     if (!selectedElementId) return;
     setContext((prev) => ({ ...prev, ...patch }));
-    api
-      .patch(`/context/${diagramId}/${selectedElementId}`, patch)
-      .catch(console.error);
+    try {
+      await api.patch(`/context/${diagramId}/${selectedElementId}`, patch);
+    } catch (err) {
+      console.error(err);
+    }
   }
 
-  function refreshFiles() {
+  function fetchContext() {
     if (!selectedElementId) return;
-    api
-      .get(`/context/${diagramId}/${selectedElementId}`)
+    api.get(`/context/${diagramId}/${selectedElementId}`)
       .then((r) => setContext(r.data))
       .catch(console.error);
   }
 
-  if (!selectedElementId) return null;
+  if (!selectedElementId || !drawerOpen) return null;
 
   return (
     <>
@@ -57,18 +68,19 @@ export default function ContextDrawer({ diagramId, api: excalidrawAPI }) {
       <div
         style={{
           position:     "fixed",
-          right:        0, top: 0,
+          right:        0, 
+          top:          0,
           height:       "100vh",
           width:        320,
-          background:   "rgba(255, 255, 255, 0.70)",
+          background:   "var(--bg-base)",
           backdropFilter: "blur(24px)",
           WebkitBackdropFilter: "blur(24px)",
-          borderLeft:   "1px solid rgba(255, 255, 255, 0.5)",
-          boxShadow:    "-8px 0 32px rgba(105, 101, 219, 0.15)",
-          zIndex:       900,
+          borderLeft:   "1px solid var(--border)",
+          boxShadow:    "-8px 0 32px rgba(0, 0, 0, 0.15)",
+          zIndex:       400,
           display:      "flex",
           flexDirection:"column",
-          fontFamily:   "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+          fontFamily:   "inherit",
           transition:   "all 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
         }}
         onClick={(e) => e.stopPropagation()} // don't close on inner clicks
@@ -76,17 +88,17 @@ export default function ContextDrawer({ diagramId, api: excalidrawAPI }) {
         {/* Header */}
         <div style={{
           padding:      "14px 16px",
-          borderBottom: "1px solid #f0f0f0",
+          borderBottom: "1px solid var(--border)",
           display:      "flex",
           justifyContent:"space-between",
           alignItems:   "center",
           flexShrink:   0,
         }}>
           <div>
-            <div style={{ fontWeight: 700, fontSize: 13, color: "#1a1a1a" }}>
+            <div style={{ fontWeight: 700, fontSize: 13, color: "var(--text-primary)" }}>
               Context Layer
             </div>
-            <div style={{ fontSize: 11, color: "#aaa", marginTop: 1, fontFamily: "monospace" }}>
+            <div style={{ fontSize: 11, color: "var(--text-hint)", marginTop: 1, fontFamily: "monospace" }}>
               {selectedElementId.slice(0, 12)}…
             </div>
           </div>
@@ -96,10 +108,11 @@ export default function ContextDrawer({ diagramId, api: excalidrawAPI }) {
                 excalidrawAPI.updateScene({ appState: { selectedElementIds: {} } });
               }
               setSelectedElementId(null);
+              setDrawerOpen(false);
             }}
             style={{
               background: "none", border: "none", cursor: "pointer",
-              color: "#999", fontSize: 16, padding: 4, lineHeight: 1,
+              color: "var(--text-hint)", fontSize: 16, padding: 4, lineHeight: 1,
             }}
           >✕</button>
         </div>
@@ -109,7 +122,7 @@ export default function ContextDrawer({ diagramId, api: excalidrawAPI }) {
           display:      "flex",
           padding:      "8px 12px",
           gap:          4,
-          borderBottom: "1px solid #f0f0f0",
+          borderBottom: "1px solid var(--border)",
           flexShrink:   0,
         }}>
           {TABS.map((tab) => (
@@ -121,9 +134,9 @@ export default function ContextDrawer({ diagramId, api: excalidrawAPI }) {
                 padding:      "5px 0",
                 borderRadius: 6,
                 border:       "1px solid",
-                borderColor:  activeTab === tab ? "#6965db" : "#e8e8e8",
-                background:   activeTab === tab ? "#6965db" : "transparent",
-                color:        activeTab === tab ? "#fff" : "#666",
+                borderColor:  activeTab === tab ? "var(--accent)" : "transparent",
+                background:   activeTab === tab ? "var(--accent)" : "transparent",
+                color:        activeTab === tab ? "#0d0d0d" : "var(--text-secondary)",
                 fontWeight:   activeTab === tab ? 600 : 400,
                 fontSize:     12,
                 cursor:       "pointer",
@@ -145,32 +158,31 @@ export default function ContextDrawer({ diagramId, api: excalidrawAPI }) {
             <div style={{ display:"flex", justifyContent:"center", padding:"40px 0" }}>
               <div style={{
                 width:36, height:36,
-                border:"3px solid #6965db",
+                border:"3px solid var(--accent)",
                 borderTopColor:"transparent",
                 borderRadius:"50%",
                 animation:"spin 0.8s linear infinite",
               }}/>
-              <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
             </div>
           ) : context ? (
             <>
               {activeTab === "notes" && (
                 <NotesTab
                   notes={context.notes}
-                  onSave={(notes) => save({ notes })}
+                  onSave={(notes) => patchContext({ notes })}
                 />
               )}
               {activeTab === "links" && (
                 <LinksTab
                   links={context.links}
-                  onSave={(links) => save({ links })}
+                  onSave={(links) => patchContext({ links })}
                 />
               )}
               {activeTab === "code" && (
                 <CodeTab
                   snippet={context.codeSnippet}
                   language={context.language}
-                  onSave={(codeSnippet, language) => save({ codeSnippet, language })}
+                  onSave={(codeSnippet, language) => patchContext({ codeSnippet, language })}
                 />
               )}
               {activeTab === "files" && (
@@ -178,7 +190,7 @@ export default function ContextDrawer({ diagramId, api: excalidrawAPI }) {
                   diagramId={diagramId}
                   elementId={selectedElementId}
                   files={context.files}
-                  onRefresh={refreshFiles}
+                  onRefresh={fetchContext}
                 />
               )}
             </>

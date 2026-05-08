@@ -1,98 +1,156 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from 'react';
+import { ExternalLink, Trash2 } from 'lucide-react';
 
-export default function LinksTab({ links, onSave }) {
-  const [list,  setList]  = useState(links ?? []);
-  const [input, setInput] = useState("");
+export default function LinksTab({ links = [], onSave }) {
+  const [localLinks, setLocalLinks] = useState(links);
+  const [inputVal, setInputVal] = useState('');
+  const [error, setError] = useState('');
 
-  useEffect(() => { setList(links ?? []); }, [links]);
+  useEffect(() => {
+    setLocalLinks(links || []);
+  }, [links]);
 
-  function addLink() {
-    const url = input.trim();
-    if (!url) return;
-    const next = [...list, url];
-    setList(next);
-    onSave(next);
-    setInput("");
-  }
+  const addLink = () => {
+    if (!inputVal) return;
+    
+    let validUrl = inputVal;
+    if (!validUrl.startsWith('http://') && !validUrl.startsWith('https://')) {
+      validUrl = 'https://' + validUrl;
+    }
+    
+    try {
+      new URL(validUrl);
+    } catch (_) {
+      setError('Enter a valid URL');
+      return;
+    }
+    
+    const newLinks = [...localLinks, validUrl];
+    setLocalLinks(newLinks);
+    onSave(newLinks);
+    setInputVal('');
+    setError('');
+  };
 
-  function removeLink(idx) {
-    const next = list.filter((_, i) => i !== idx);
-    setList(next);
-    onSave(next);
-  }
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addLink();
+    }
+  };
+
+  const removeLink = (index) => {
+    const newLinks = [...localLinks];
+    newLinks.splice(index, 1);
+    setLocalLinks(newLinks);
+    onSave(newLinks);
+  };
 
   return (
-    <div>
-      <label style={{ fontSize: 11, fontWeight: 600, color: "#999", marginBottom: 6, display: "block", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-        Links
-      </label>
-
-      {/* Input row */}
-      <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
-        <input
-          type="url"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && addLink()}
-          placeholder="https://docs.example.com"
-          style={{
-            flex: 1, border: "1px solid #e8e8e8", borderRadius: 7,
-            padding: "7px 10px", fontSize: 12, outline: "none", color: "#333",
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <div style={{ display: 'flex', gap: '8px' }}>
+        <input 
+          type="url" 
+          placeholder="https://example.com"
+          value={inputVal}
+          onChange={(e) => {
+            setInputVal(e.target.value);
+            setError('');
           }}
-          onFocus={(e) => (e.target.style.borderColor = "#6965db")}
-          onBlur={(e)  => (e.target.style.borderColor = "#e8e8e8")}
+          onKeyDown={handleKeyDown}
+          style={{
+            flex: 1,
+            background: 'var(--bg-elevated)',
+            border: '1px solid var(--border)',
+            color: 'var(--text-primary)',
+            borderRadius: 'var(--radius-sm)',
+            padding: '8px 10px',
+            fontSize: '12px',
+            outline: 'none'
+          }}
         />
-        <button
+        <button 
           onClick={addLink}
           style={{
-            padding: "7px 12px", borderRadius: 7, border: "none",
-            background: "#6965db", color: "#fff", fontWeight: 600,
-            fontSize: 13, cursor: "pointer",
+            background: 'var(--accent)',
+            color: '#0d0d0d',
+            fontWeight: 600,
+            padding: '8px 14px',
+            borderRadius: 'var(--radius-sm)',
+            whiteSpace: 'nowrap',
+            fontSize: '12px',
+            border: 'none',
+            cursor: 'pointer'
           }}
         >
           Add
         </button>
       </div>
+      {error && <div style={{ color: 'var(--danger)', fontSize: '10px', marginTop: '4px' }}>{error}</div>}
 
-      {/* Link list */}
-      {list.length === 0 ? (
-        <p style={{ fontSize: 12, color: "#bbb", textAlign: "center", paddingTop: 20 }}>
-          No links yet
-        </p>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {list.map((url, i) => (
-            <div
-              key={i}
-              style={{
-                display: "flex", alignItems: "center", gap: 8,
-                background: "#f8f7ff", borderRadius: 7, padding: "7px 10px",
-                border: "1px solid #e3e2fe",
-              }}
-            >
-              <span style={{ fontSize: 13 }}>🔗</span>
-              <a
-                href={url} target="_blank" rel="noreferrer"
-                style={{
-                  flex: 1, fontSize: 12, color: "#6965db",
-                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                  textDecoration: "none",
-                }}
-                title={url}
-              >
-                {url}
-              </a>
-              <button
-                onClick={() => removeLink(i)}
-                style={{
-                  background: "none", border: "none", cursor: "pointer",
-                  color: "#ccc", fontSize: 14, lineHeight: 1, padding: 0, flexShrink: 0,
-                }}
-              >✕</button>
-            </div>
-          ))}
-        </div>
-      )}
+      <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        {localLinks.length === 0 ? (
+          <div style={{ textAlign: 'center', color: 'var(--text-hint)', fontSize: '12px', marginTop: '20px' }}>
+            No links added
+          </div>
+        ) : (
+          localLinks.map((link, i) => {
+            let hostname = link;
+            try {
+              hostname = new URL(link).hostname;
+            } catch(e) {}
+            
+            return (
+              <div key={i} style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 10px',
+                background: 'var(--bg-elevated)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-sm)'
+              }}>
+                <ExternalLink size={12} color="var(--text-secondary)" />
+                <a 
+                  href={link} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  style={{
+                    color: 'var(--accent)',
+                    fontSize: '12px',
+                    flex: 1,
+                    textOverflow: 'ellipsis',
+                    overflow: 'hidden',
+                    whiteSpace: 'nowrap',
+                    maxWidth: '200px',
+                    textDecoration: 'none'
+                  }}
+                  title={link}
+                >
+                  {hostname}
+                </a>
+                <button 
+                  onClick={() => removeLink(i)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '2px'
+                  }}
+                >
+                  <Trash2 size={14} color="var(--text-secondary)" 
+                    onMouseEnter={(e) => e.currentTarget.style.color = 'var(--danger)'}
+                    onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
+                  />
+                </button>
+              </div>
+            );
+          })
+        )}
+      </div>
     </div>
   );
 }
