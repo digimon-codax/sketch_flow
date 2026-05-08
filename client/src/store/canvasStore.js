@@ -18,13 +18,13 @@ export const useCanvasStore = create((set) => ({
   setStrokeStyle: (style) => set({ strokeStyle: style }),
 
   remoteCursors: {},
-  updateRemoteCursor: (userId, data) => set((state) => ({
-    remoteCursors: { ...state.remoteCursors, [userId]: { ...data, lastUpdate: Date.now() } }
+  setRemoteCursor: (userId, data) => set(state => ({
+    remoteCursors: { ...state.remoteCursors, [userId]: data }
   })),
-  removeRemoteCursor: (userId) => set((state) => {
-    const newCursors = { ...state.remoteCursors };
-    delete newCursors[userId];
-    return { remoteCursors: newCursors };
+  removeRemoteCursor: (userId) => set(state => {
+    const next = { ...state.remoteCursors }
+    delete next[userId]
+    return { remoteCursors: next }
   }),
 
   roomUsers: [],

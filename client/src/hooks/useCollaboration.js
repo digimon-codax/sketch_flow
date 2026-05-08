@@ -8,7 +8,7 @@ export function useCollaboration(fabricCanvasRef, diagramId, ws) {
   useEffect(() => {
     if (!diagramId || !ws || !fabricCanvasRef.current) return;
 
-    const userStr = localStorage.getItem('user');
+    const userStr = localStorage.getItem('sf_user');
     const user = userStr ? JSON.parse(userStr) : { _id: crypto.randomUUID(), name: 'Anonymous' };
     const userId = user._id || user.id;
     const userName = user.name || 'Anonymous';
@@ -33,7 +33,13 @@ export function useCollaboration(fabricCanvasRef, diagramId, ws) {
 
     ws.on('CURSOR_MOVE', msg => {
       if (msg.userId === userId) return;
-      useCanvasStore.getState().updateRemoteCursor(msg.userId, msg.payload);
+      useCanvasStore.getState().setRemoteCursor(msg.userId, {
+        x: msg.payload.x,
+        y: msg.payload.y,
+        color: msg.payload.color,
+        name: msg.payload.name,
+        lastSeen: Date.now()
+      });
     });
 
     ws.on('USER_LIST', msg => {
@@ -76,9 +82,9 @@ export function useCollaboration(fabricCanvasRef, diagramId, ws) {
       
       if (!fc) return;
       const pointer = fc.getPointer(e.e);
-      const colors = ['#d4a853', '#3498db', '#e74c3c', '#2ecc71', '#9b59b6'];
-      const colorIndex = userId ? userId.charCodeAt(0) % colors.length : 0;
-      const color = colors[colorIndex];
+      const store = useCanvasStore.getState();
+      const me = store.roomUsers.find(u => u.userId === userId);
+      const color = me ? me.color : '#3498db';
 
       ws.send('CURSOR_MOVE', diagramId, userId, { 
         x: pointer.x, 

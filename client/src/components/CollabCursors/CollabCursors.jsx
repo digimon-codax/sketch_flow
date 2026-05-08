@@ -1,53 +1,82 @@
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useCanvasStore } from '../../store/canvasStore';
 import { CanvasContext } from '../../canvas/SketchCanvas';
 
-// A simple cursor SVG pointing top-left
-const CursorSVG = ({ color }) => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill={color} stroke="white" strokeWidth="2" xmlns="http://www.w3.org/2000/svg">
-    <path d="M4 2L20 10L13 13L16 21L12 23L9 15L3 18L4 2Z" />
-  </svg>
-);
-
-// Function to convert hex color to rgba for the background tint
-const hexToRgba = (hex, alpha) => {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-};
-
 export default function CollabCursors() {
-  const remoteCursors = useCanvasStore((state) => state.remoteCursors);
-  const fabricCanvasRef = useContext(CanvasContext);
-  
-  // We need to force a re-render when viewport changes so cursors stick to canvas coords
+  const remoteCursors = useCanvasStore(state => state.remoteCursors);
+  const removeRemoteCursor = useCanvasStore(state => state.removeRemoteCursor);
+  const fabricCanvasRef = React.useContext(CanvasContext);
   const [, setTick] = useState(0);
 
   useEffect(() => {
-    if (!fabricCanvasRef || !fabricCanvasRef.current) return;
-    const fc = fabricCanvasRef.current;
-    
-    const updateViewport = () => setTick(t => t + 1);
-    
-    fc.on('mouse:wheel', updateViewport);
-    fc.on('mouse:move', updateViewport); // Panning changes viewport
-    fc.on('after:render', updateViewport);
+    const interval = setInterval(() => {
+      const now = Date.now();
+      let hasChanges = false;
+      Object.entries(remoteCursors).forEach(([uid, cursor]) => {
+        if (now - cursor.lastSeen > 5000) {
+          removeRemoteCursor(uid);
+          hasChanges = true;
+        }
+      });
+      if (hasChanges) {
+        setTick(t => t + 1); // trigger re-render if cursors were removed
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [remoteCursors, removeRemoteCursor]);
 
-    // Force re-render periodically to hide idle cursors
-    const interval = setInterval(updateViewport, 1000);
+  if (!fabricCanvasRef?.current) return null;
 
-    return () => {
-      fc.off('mouse:wheel', updateViewport);
-      fc.off('mouse:move', updateViewport);
-      fc.off('after:render', updateViewport);
-      clearInterval(interval);
-    };
-  }, [fabricCanvasRef]);
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      width: '100vw',
+      height: '100vh',
+      pointerEvents: 'none',
+      zIndex: 999,
+      overflow: 'hidden'
+    }}>
+      {Object.entries(remoteCursors).map(([uid, cursor]) => {
+        const vpt = fabricCanvasRef.current.viewportTransform;
+        let screenX = cursor.x;
+        let screenY = cursor.y;
+        
+        if (vpt) {
+            screenX = cursor.x * vpt[0] + vpt[4];
+            screenY = cursor.y * vpt[3] + vpt[5];
+        }
 
-  if (!fabricCanvasRef || !fabricCanvasRef.current) return null;
-  const fc = fabricCanvasRef.current;
-  const vpt = fc.viewportTransform;
+        return (
+          <div key={uid} style={{
+            position: 'absolute',
+            transform: `translate(${screenX}px, ${screenY}px)`,
+            transition: 'transform 0.06s linear'
+          }}>
+            <svg width="16" height="20" viewBox="0 0 16 20">
+              <path d="M 0 0 L 0 14 L 4 11 L 7 17 L 9 16 L 6 10 L 10 10 Z"
+                fill={cursor.color} stroke="white" strokeWidth="1"/>
+            </svg>
+            <div style={{
+              fontFamily: 'JetBrains Mono',
+              fontSize: '10px',
+              color: cursor.color,
+              background: cursor.color + '22',
+              border: `1px solid ${cursor.color}44`,
+              padding: '2px 6px',
+              borderRadius: '4px',
+              marginTop: '2px',
+              whiteSpace: 'nowrap'
+            }}>
+              {cursor.name}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
   if (!vpt) return null;
 
