@@ -23,6 +23,7 @@ export default function SketchCanvas({
   const saveTimeoutRef = useRef(null);
 
   const activeTool = useCanvasStore((state) => state.activeTool);
+  const cleanupLoading = useUIStore((state) => state.cleanupLoading);
   const [eraserPos, setEraserPos] = useState({ x: -100, y: -100 });
 
   useEffect(() => {
@@ -370,6 +371,16 @@ export default function SketchCanvas({
       }}
     >
       <canvas ref={canvasRef} style={{ display: 'block' }} />
+      
+      {cleanupLoading && (
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          zIndex: 50,
+          background: 'rgba(212,168,83,0.03)',
+          pointerEvents: 'none'
+        }} />
+      )}
       
       {activeTool === 'eraser' && (
         <div style={{

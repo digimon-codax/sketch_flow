@@ -10,4 +10,7 @@ export const useUIStore = create((set) => ({
   
   drawerOpen: false,
   setDrawerOpen: (bool) => set({ drawerOpen: bool }),
+
+  cleanupLoading: false,
+  setCleanupLoading: (bool) => set({ cleanupLoading: bool }),
 }));

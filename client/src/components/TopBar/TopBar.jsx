@@ -3,6 +3,7 @@ import { Sparkles, BrainCircuit, Share2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../api';
 import { CanvasContext } from '../../canvas/SketchCanvas';
+import { useCleanup } from '../../features/cleanup/useCleanup';
 import './TopBar.css';
 
 const DiamondLogo = () => (
@@ -18,6 +19,7 @@ export default function TopBar({ diagramId, diagramName, saveState }) {
   const [copied, setCopied] = useState(false);
   
   const fabricCanvasRef = useContext(CanvasContext);
+  const { run: runCleanup, loading: cleanupLoading } = useCleanup(fabricCanvasRef);
   const navigate = useNavigate();
 
   // Sync external name changes
@@ -159,8 +161,21 @@ export default function TopBar({ diagramId, diagramName, saveState }) {
         display: 'flex',
         gap: '8px'
       }}>
-        <button className="feature-btn" onClick={() => {}}>
-          <Sparkles size={14} /> Cleanup
+        <button 
+          className={`feature-btn ${cleanupLoading ? 'loading' : ''}`} 
+          onClick={runCleanup}
+          disabled={cleanupLoading}
+        >
+          {cleanupLoading ? (
+            <div className="spin-icon" style={{
+              width: '14px', height: '14px', borderRadius: '50%',
+              border: '2px solid rgba(212,168,83,0.3)',
+              borderTopColor: 'var(--accent)'
+            }} />
+          ) : (
+            <Sparkles size={14} />
+          )}
+          {cleanupLoading ? "Cleaning..." : "Cleanup"}
         </button>
         <button className="feature-btn" onClick={() => {}}>
           <BrainCircuit size={14} /> Assist
