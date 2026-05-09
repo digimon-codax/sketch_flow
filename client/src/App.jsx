@@ -42,6 +42,14 @@ function AppRoutes() {
           </ProtectedRoute>
         } 
       />
+      <Route 
+        path="/d/:id" 
+        element={
+          <ProtectedRoute>
+            <CanvasPage />
+          </ProtectedRoute>
+        } 
+      />
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );

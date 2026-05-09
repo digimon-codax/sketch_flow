@@ -22,8 +22,9 @@ const TOOLS = [
 ];
 
 export default function LeftToolbar() {
-  const { activeTool, setActiveTool } = useCanvasStore();
+  const { activeTool, setActiveTool, userRole } = useCanvasStore();
   const fabricCanvasRef = React.useContext(CanvasContext);
+  const isViewer = userRole === 'viewer';
 
   const handleToolClick = (toolId) => {
     if (toolId === 'eraser') {
@@ -43,27 +44,30 @@ export default function LeftToolbar() {
 
   return (
     <div className="left-toolbar">
-      {TOOLS.map((tool, idx) => {
-        if (tool.type === 'separator') {
-          return <div key={`sep-${idx}`} className="tool-separator" />;
-        }
-        const Icon = tool.icon;
-        const isActive = activeTool === tool.id;
+      <div style={{ opacity: isViewer ? 0.35 : 1, pointerEvents: isViewer ? 'none' : 'auto' }}>
+        {TOOLS.map((tool, idx) => {
+          if (tool.type === 'separator') {
+            return <div key={`sep-${idx}`} className="tool-separator" />;
+          }
+          const Icon = tool.icon;
+          const isActive = activeTool === tool.id;
 
-        return (
-          <button
-            key={tool.id}
-            className={`tool-btn ${isActive ? 'active' : ''}`}
-            onClick={() => handleToolClick(tool.id)}
-          >
-            <Icon size={16} />
-            <div className="tool-tooltip">
-              <span>{tool.label}</span>
-              {tool.key && <span className="tool-tooltip-key">{tool.key}</span>}
-            </div>
-          </button>
-        );
-      })}
+          return (
+            <button
+              key={tool.id}
+              className={`tool-btn ${isActive ? 'active' : ''}`}
+              onClick={() => handleToolClick(tool.id)}
+            >
+              <Icon size={16} />
+              <div className="tool-tooltip">
+                <span>{tool.label}</span>
+                {tool.key && <span className="tool-tooltip-key">{tool.key}</span>}
+              </div>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
+

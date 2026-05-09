@@ -1,27 +1,25 @@
 import React, { useState, useEffect } from "react";
 
-export default function NotesTab({ notes, onSave }) {
+export default function NotesTab({ notes, onSave, isReadOnly = false }) {
   const [local, setLocal] = useState(notes || '');
 
-  useEffect(() => {
-    setLocal(notes || '');
-  }, [notes]);
+  useEffect(() => { setLocal(notes || ''); }, [notes]);
 
   useEffect(() => {
+    if (isReadOnly) return;
     const handler = setTimeout(() => {
-      if (local !== (notes || '')) {
-        onSave(local);
-      }
+      if (local !== (notes || '')) onSave(local);
     }, 800);
     return () => clearTimeout(handler);
-  }, [local, notes, onSave]);
+  }, [local, notes, onSave, isReadOnly]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <textarea
         value={local}
-        onChange={(e) => setLocal(e.target.value)}
-        placeholder="Add notes about this element..."
+        readOnly={isReadOnly}
+        onChange={(e) => { if (!isReadOnly) setLocal(e.target.value); }}
+        placeholder={isReadOnly ? "No notes added." : "Add notes about this element..."}
         style={{
           flex: 1,
           background: 'transparent',
@@ -33,7 +31,8 @@ export default function NotesTab({ notes, onSave }) {
           color: 'var(--text-primary)',
           resize: 'none',
           outline: 'none',
-          fontFamily: 'inherit'
+          fontFamily: 'inherit',
+          cursor: isReadOnly ? 'default' : 'text',
         }}
       />
     </div>

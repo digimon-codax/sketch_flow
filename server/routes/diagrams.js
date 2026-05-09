@@ -146,4 +146,170 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
+// ── POST /api/diagrams/:id/members ────────────────────────────────────────
+router.post("/:id/members", async (req, res) => {
+  try {
+    const { email, role } = req.body;
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(404).json({ error: "Diagram not found" });
+    }
+
+    const diagram = await Diagram.findById(req.params.id);
+    if (!diagram) return res.status(404).json({ error: "Diagram not found" });
+
+    if (!isMember(diagram, req.userId)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const User = (await import("../models/User.js")).default;
+    const foundUser = await User.findOne({ email: email?.trim().toLowerCase() });
+    if (!foundUser) {
+      return res.status(404).json({ error: "No user found with that email" });
+    }
+
+    const alreadyMember = diagram.members.some(
+      (m) => m.userId.toString() === foundUser._id.toString()
+    );
+    if (alreadyMember) {
+      return res.status(400).json({ error: "User is already a collaborator" });
+    }
+
+    diagram.members.push({ userId: foundUser._id, role: role ?? "editor" });
+    await diagram.save();
+
+    const populated = await Diagram.findById(diagram._id).populate(
+      "members.userId",
+      "name email"
+    );
+
+    return res.json(
+      populated.members.map((m) => ({
+        userId: m.userId._id,
+        name: m.userId.name,
+        email: m.userId.email,
+        role: m.role,
+      }))
+    );
+  } catch (err) {
+    console.error("POST /diagrams/:id/members error:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── GET /api/diagrams/:id/members ─────────────────────────────────────────
+router.get("/:id/members", async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(404).json({ error: "Diagram not found" });
+    }
+
+    const diagram = await Diagram.findById(req.params.id).populate(
+      "members.userId",
+      "name email"
+    );
+    if (!diagram) return res.status(404).json({ error: "Diagram not found" });
+
+    const isMemberCheck = diagram.members.some(
+      (m) => m.userId._id.toString() === req.userId.toString()
+    );
+    if (!isMemberCheck) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    return res.json(
+      diagram.members.map((m) => ({
+        userId: m.userId._id,
+        name: m.userId.name,
+        email: m.userId.email,
+        role: m.role,
+      }))
+    );
+  } catch (err) {
+    console.error("GET /diagrams/:id/members error:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── DELETE /api/diagrams/:id/members/:memberId ────────────────────────────
+router.delete("/:id/members/:memberId", async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(404).json({ error: "Diagram not found" });
+    }
+
+    const diagram = await Diagram.findById(req.params.id);
+    if (!diagram) return res.status(404).json({ error: "Diagram not found" });
+
+    const requesterMember = diagram.members.find(
+      (m) => m.userId.toString() === req.userId.toString()
+    );
+    if (!requesterMember) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    if (requesterMember.role !== "owner") {
+      return res.status(403).json({ error: "Only the owner can remove members" });
+    }
+
+    const owners = diagram.members.filter((m) => m.role === "owner");
+    if (
+      owners.length === 1 &&
+      req.params.memberId === req.userId.toString()
+    ) {
+      return res.status(400).json({ error: "Cannot remove the sole owner" });
+    }
+
+    diagram.members = diagram.members.filter(
+      (m) => m.userId.toString() !== req.params.memberId
+    );
+    await diagram.save();
+
+    return res.json({ success: true });
+  } catch (err) {
+    console.error("DELETE /diagrams/:id/members/:memberId error:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── PATCH /api/diagrams/:id/members/:memberId ─────────────────────────────
+router.patch("/:id/members/:memberId", async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(404).json({ error: "Diagram not found" });
+    }
+
+    const diagram = await Diagram.findById(req.params.id);
+    if (!diagram) return res.status(404).json({ error: "Diagram not found" });
+
+    if (!isOwner(diagram, req.userId)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const member = diagram.members.find(
+      (m) => m.userId.toString() === req.params.memberId
+    );
+    if (!member) return res.status(404).json({ error: "Member not found" });
+
+    member.role = req.body.role;
+    await diagram.save();
+
+    const populated = await Diagram.findById(diagram._id).populate(
+      "members.userId",
+      "name email"
+    );
+
+    return res.json(
+      populated.members.map((m) => ({
+        userId: m.userId._id,
+        name: m.userId.name,
+        email: m.userId.email,
+        role: m.role,
+      }))
+    );
+  } catch (err) {
+    console.error("PATCH /diagrams/:id/members/:memberId error:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 export default router;
+

@@ -23,6 +23,7 @@ export default function SketchCanvas({
   const saveTimeoutRef = useRef(null);
 
   const activeTool = useCanvasStore((state) => state.activeTool);
+  const userRole = useCanvasStore((state) => state.userRole);
   const cleanupLoading = useUIStore((state) => state.cleanupLoading);
   const [eraserPos, setEraserPos] = useState({ x: -100, y: -100 });
 
@@ -303,6 +304,26 @@ export default function SketchCanvas({
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [diagramId]);
+
+  // Apply viewer-mode lock whenever userRole changes
+  useEffect(() => {
+    const fc = fcRef.current;
+    if (!fc) return;
+    if (userRole === 'viewer') {
+      fc.isDrawingMode = false;
+      fc.selection = false;
+      fc.defaultCursor = 'default';
+      fc.hoverCursor = 'default';
+      fc.getObjects().forEach(obj => {
+        obj.selectable = false;
+        obj.evented = false;
+      });
+    } else {
+      fc.selection = true;
+      fc.defaultCursor = 'default';
+    }
+    fc.requestRenderAll();
+  }, [userRole]);
 
   // Handle active tool changes (cursor + pencil freehand)
   useEffect(() => {

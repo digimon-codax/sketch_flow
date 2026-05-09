@@ -29,4 +29,8 @@ export const useCanvasStore = create((set) => ({
 
   roomUsers: [],
   setRoomUsers: (users) => set({ roomUsers: users }),
+
+  userRole: 'editor',
+  setUserRole: (role) => set({ userRole: role }),
 }));
+

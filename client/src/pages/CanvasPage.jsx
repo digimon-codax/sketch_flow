@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { fabric } from 'fabric';
+import { EyeOff } from 'lucide-react';
 import api from '../api';
 import SketchCanvas, { CanvasContext } from '../canvas/SketchCanvas';
 import { useCanvasStore } from '../store/canvasStore';
@@ -49,6 +50,7 @@ export default function CanvasPage() {
   const [canvasReady, setCanvasReady] = useState(false);
   const [saveState, setSaveState] = useState(''); // 'saving' | 'saved' | ''
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [myRole, setMyRole] = useState('editor');
   
   const fabricCanvasRef = useRef(null);
   const historyRef = useRef(null);
@@ -62,7 +64,20 @@ export default function CanvasPage() {
     const fetchDiagram = async () => {
       try {
         const res = await api.get(`/diagrams/${id}`);
-        if (isMounted) setDiagram(res.data);
+        if (isMounted) {
+          setDiagram(res.data);
+
+          // Detect role
+          const sfUser = (() => { try { return JSON.parse(localStorage.getItem('sf_user') ?? '{}'); } catch { return {}; } })();
+          const currentUserId = (sfUser.id ?? sfUser._id ?? '').toString();
+          const myMember = res.data.members?.find(m => {
+            const mId = (m.userId?._id ?? m.userId)?.toString();
+            return mId === currentUserId;
+          });
+          const role = myMember?.role ?? 'viewer';
+          setMyRole(role);
+          useCanvasStore.getState().setUserRole(role);
+        }
       } catch (err) {
         console.error('Failed to load diagram', err);
       } finally {
@@ -221,13 +236,31 @@ export default function CanvasPage() {
     );
   }
 
+  const isReadOnly = myRole === 'viewer';
+
   return (
     <CanvasContext.Provider value={fabricCanvasRef}>
       <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--bg-base)', position: 'relative' }}>
         <TopBar diagramId={diagram?._id} diagramName={diagram?.name} saveState={saveState} />
+
+        {/* Viewer banner */}
+        {isReadOnly && (
+          <div style={{
+            height: 32, background: 'var(--accent-dim)',
+            borderBottom: '1px solid rgba(212,168,83,0.25)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            gap: 8, flexShrink: 0,
+          }}>
+            <EyeOff size={12} color="var(--accent)" />
+            <span style={{ fontSize: 12, color: 'var(--accent)', fontFamily: 'Inter, sans-serif' }}>
+              View only — you don't have edit access to this diagram
+            </span>
+          </div>
+        )}
+
         <PropertiesPanel canvasReady={canvasReady} />
         <CollabCursors />
-        <ContextDrawer diagramId={id} />
+        <ContextDrawer diagramId={id} isReadOnly={isReadOnly} />
         <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
           <LeftToolbar />
           <SketchCanvas 
