@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../../api';
 import { CanvasContext } from '../../canvas/SketchCanvas';
 import { useCleanup } from '../../features/cleanup/useCleanup';
+import { useArchAssist } from '../../features/assist/useArchAssist';
 import './TopBar.css';
 
 const DiamondLogo = () => (
@@ -20,6 +21,7 @@ export default function TopBar({ diagramId, diagramName, saveState }) {
   
   const fabricCanvasRef = useContext(CanvasContext);
   const { run: runCleanup, loading: cleanupLoading } = useCleanup(fabricCanvasRef);
+  const { run: runAssist, loading: assistLoading } = useArchAssist(fabricCanvasRef);
   const navigate = useNavigate();
 
   // Sync external name changes
@@ -177,8 +179,21 @@ export default function TopBar({ diagramId, diagramName, saveState }) {
           )}
           {cleanupLoading ? "Cleaning..." : "Cleanup"}
         </button>
-        <button className="feature-btn" onClick={() => {}}>
-          <BrainCircuit size={14} /> Assist
+        <button 
+          className={`feature-btn ${assistLoading ? 'loading' : ''}`} 
+          onClick={runAssist}
+          disabled={assistLoading}
+        >
+          {assistLoading ? (
+            <div className="spin-icon" style={{
+              width: '14px', height: '14px', borderRadius: '50%',
+              border: '2px solid rgba(212,168,83,0.3)',
+              borderTopColor: 'var(--accent)'
+            }} />
+          ) : (
+            <BrainCircuit size={14} />
+          )}
+          {assistLoading ? "Analyzing..." : "Assist"}
         </button>
       </div>
 

@@ -10,6 +10,7 @@ import PropertiesPanel from '../components/PropertiesPanel/PropertiesPanel';
 import TopBar from '../components/TopBar/TopBar';
 import CollabCursors from '../components/CollabCursors/CollabCursors';
 import ContextDrawer from '../components/Features/ContextLayer/ContextDrawer';
+import AssistPanel from '../features/assist/AssistPanel';
 import { deserializeCanvas } from '../canvas/serialize';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { useCollaboration } from '../hooks/useCollaboration';
@@ -240,6 +241,7 @@ export default function CanvasPage() {
             }} 
           />
         </div>
+        <AssistPanel />
 
         {/* Shortcuts Help Button */}
         <button 
