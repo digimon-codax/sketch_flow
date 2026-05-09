@@ -1,31 +1,11 @@
-import React, { useEffect, useState } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import React from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import Dashboard from './pages/Dashboard';
-
 import CanvasPage from './pages/CanvasPage';
-
-// Simple auth wrapper
-function ProtectedRoute({ children }) {
-  const token = localStorage.getItem('sf_token');
-  const location = useLocation();
-
-  if (!token) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
-  }
-  
-  return children;
-}
-
-// Redirect if already logged in
-function AuthRoute({ children }) {
-  const token = localStorage.getItem('sf_token');
-  if (token) {
-    return <Navigate to="/" replace />;
-  }
-  return children;
-}
+import NotFoundPage from './pages/NotFoundPage';
+import ProtectedRoute, { PublicRoute } from './components/ProtectedRoute';
 
 function AppRoutes() {
   return (
@@ -33,17 +13,17 @@ function AppRoutes() {
       <Route 
         path="/login" 
         element={
-          <AuthRoute>
+          <PublicRoute>
             <LoginPage />
-          </AuthRoute>
+          </PublicRoute>
         } 
       />
       <Route 
         path="/register" 
         element={
-          <AuthRoute>
+          <PublicRoute>
             <RegisterPage />
-          </AuthRoute>
+          </PublicRoute>
         } 
       />
       <Route 
@@ -62,6 +42,7 @@ function AppRoutes() {
           </ProtectedRoute>
         } 
       />
+      <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );
 }
