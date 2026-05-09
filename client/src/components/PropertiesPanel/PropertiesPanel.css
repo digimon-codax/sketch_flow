@@ -1,156 +1,138 @@
-.props-panel-wrapper {
+.props-panel {
   position: fixed;
-  top: 56px; /* Below topbar */
+  top: 56px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 100;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none; /* Wrapper shouldn't block clicks */
-}
-
-.props-panel {
+  z-index: 300;
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 8px 12px;
+  padding: 8px 16px;
   display: flex;
   align-items: center;
   gap: 16px;
-  pointer-events: auto; /* Panel itself is interactive */
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  white-space: nowrap;
 }
 
 .props-section {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-}
-
-.props-section-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 
 .props-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
   color: var(--text-hint);
-  font-size: 11px;
+  display: block;
+  margin-bottom: 4px;
 }
 
-/* Color Picker */
+.props-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .color-circle {
-  width: 14px;
-  height: 14px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   cursor: pointer;
-  border: 1px solid var(--border);
-  position: relative;
-  transition: transform 0.1s ease;
-}
-
-.color-circle:hover {
-  transform: scale(1.1);
+  box-sizing: border-box;
 }
 
 .color-circle.active {
-  box-shadow: 0 0 0 2px var(--bg-surface), 0 0 0 3px #fff;
+  box-shadow: 0 0 0 2px var(--bg-surface), 0 0 0 4px currentColor;
 }
 
 .color-circle.none {
-  background: transparent;
-  overflow: hidden;
+  background: white;
+  position: relative;
+  border: 1px solid var(--border);
 }
 
 .color-circle.none::after {
   content: '';
   position: absolute;
   top: 50%;
-  left: -2px;
-  right: -2px;
+  left: 0;
+  width: 100%;
   height: 1px;
-  background-color: var(--danger);
-  transform: translateY(-50%) rotate(-45deg);
+  background: var(--danger);
+  transform: rotate(-45deg);
 }
 
-.color-input-wrapper {
-  width: 14px;
-  height: 14px;
+.color-input {
+  width: 20px;
+  height: 20px;
+  border: none;
   border-radius: 50%;
-  overflow: hidden;
-  display: flex;
-  border: 1px solid var(--border);
-  cursor: pointer;
-}
-
-.color-input-wrapper input[type="color"] {
-  width: 200%;
-  height: 200%;
-  transform: translate(-25%, -25%);
   cursor: pointer;
   padding: 0;
+  background: none;
+  overflow: hidden;
+}
+.color-input::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+.color-input::-webkit-color-swatch {
   border: none;
+  border-radius: 50%;
 }
 
-/* Toggle Buttons */
-.toggle-btn {
-  height: 24px;
-  min-width: 24px;
+.stroke-width-btn, .stroke-style-btn {
+  width: 32px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  color: var(--text-secondary);
-  padding: 0 6px;
 }
 
-.toggle-btn:hover {
-  background: var(--bg-hover);
-}
-
-.toggle-btn.active {
+.stroke-width-btn.active, .stroke-style-btn.active {
   background: var(--accent-dim);
+  border-color: var(--accent);
   color: var(--accent);
-  border-color: rgba(212, 168, 83, 0.3);
 }
 
-/* Opacity slider */
 .opacity-slider {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.opacity-slider input[type="range"] {
-  width: 80px;
-  height: 2px;
-  padding: 0;
-  background: var(--border);
-  border: none;
-}
-
-.opacity-slider input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: var(--text-primary);
+  width: 72px;
+  accent-color: var(--accent);
   cursor: pointer;
 }
 
 .opacity-value {
-  font-family: 'JetBrains Mono', monospace;
   font-size: 11px;
-  color: var(--text-primary);
-  width: 3ch;
-  text-align: right;
+  color: var(--text-secondary);
+  margin-left: 6px;
 }
 
-.props-divider {
-  width: 1px;
-  height: 24px;
-  background: var(--border);
+.font-size-select {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  border-radius: var(--radius-sm);
+  padding: 4px;
+  font-size: 12px;
+  outline: none;
+}
+
+.delete-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 4px;
+}
+
+.delete-btn:hover {
+  color: var(--danger);
 }

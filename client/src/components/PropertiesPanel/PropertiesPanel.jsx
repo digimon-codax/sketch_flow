@@ -1,203 +1,242 @@
 import React, { useEffect, useState, useContext } from 'react';
 import { CanvasContext } from '../../canvas/SketchCanvas';
+import { Trash2 } from 'lucide-react';
 import './PropertiesPanel.css';
 
 const PRESET_COLORS = ['#f0ede8', '#d4a853', '#c0392b', '#27ae60', '#3498db', '#9b59b6'];
 
-export default function PropertiesPanel({ canvasReady }) {
+export default function PropertiesPanel() {
   const fabricCanvasRef = useContext(CanvasContext);
+  const [showProps, setShowProps] = useState(false);
   const [activeObj, setActiveObj] = useState(null);
-  
-  // Local state for properties
+
   const [stroke, setStroke] = useState('#f0ede8');
   const [fill, setFill] = useState('transparent');
   const [strokeWidth, setStrokeWidth] = useState(1.5);
-  const [strokeStyle, setStrokeStyle] = useState('solid'); // 'solid', 'dashed', 'dotted'
-  const [opacity, setOpacity] = useState(1);
+  const [strokeStyle, setStrokeStyle] = useState('solid');
+  const [opacity, setOpacity] = useState(100);
+  const [fontSize, setFontSize] = useState(16);
 
   useEffect(() => {
-    if (!canvasReady || !fabricCanvasRef || !fabricCanvasRef.current) return;
+    if (!fabricCanvasRef || !fabricCanvasRef.current) return;
     const fc = fabricCanvasRef.current;
 
     const handleSelection = () => {
       const activeObjects = fc.getActiveObjects();
-      if (activeObjects.length === 1) {
+      if (activeObjects.length > 0) {
+        setShowProps(true);
         const obj = activeObjects[0];
         setActiveObj(obj);
-        
-        // Populate values
-        setStroke(obj.stroke || '#f0ede8');
-        setFill(obj.fill || 'transparent');
-        setStrokeWidth(obj.strokeWidth || 1.5);
-        setOpacity(obj.opacity ?? 1);
-        
-        if (!obj.strokeDashArray || obj.strokeDashArray.length === 0) {
-          setStrokeStyle('solid');
-        } else if (obj.strokeDashArray[0] === 8) {
-          setStrokeStyle('dashed');
-        } else if (obj.strokeDashArray[0] === 2) {
-          setStrokeStyle('dotted');
-        }
+
+        setStroke(obj.customStroke ?? obj.stroke ?? '#f0ede8');
+        setFill(obj.customFill ?? obj.fill ?? 'transparent');
+        setStrokeWidth(obj.strokeWidth ?? 1.5);
+        setStrokeStyle(obj.customStrokeStyle ?? 'solid');
+        setOpacity(Math.round((obj.opacity ?? 1) * 100));
+        setFontSize(obj.fontSize ?? 16);
       } else {
+        setShowProps(false);
         setActiveObj(null);
       }
     };
 
-    handleSelection();
-
     fc.on('selection:created', handleSelection);
     fc.on('selection:updated', handleSelection);
-    fc.on('selection:cleared', () => setActiveObj(null));
+    fc.on('selection:cleared', handleSelection);
 
     return () => {
       fc.off('selection:created', handleSelection);
       fc.off('selection:updated', handleSelection);
-      fc.off('selection:cleared', () => setActiveObj(null));
+      fc.off('selection:cleared', handleSelection);
     };
-  }, [canvasReady, fabricCanvasRef]);
+  }, [fabricCanvasRef]);
 
-  if (!activeObj) return null;
+  if (!showProps) return null;
 
-  const updateObject = (key, value) => {
-    if (!fabricCanvasRef.current || !activeObj) return;
+  const updateSelection = (updates) => {
+    if (!fabricCanvasRef || !fabricCanvasRef.current) return;
     const fc = fabricCanvasRef.current;
+    const activeObjects = fc.getActiveObjects();
     
-    activeObj.set(key, value);
+    activeObjects.forEach(obj => {
+      if (updates.stroke !== undefined) {
+        if (obj.type === 'i-text' || obj.shapeType === 'text') {
+          obj.set({ fill: updates.stroke });
+        } else {
+          obj.customStroke = updates.stroke;
+          obj.set({ stroke: updates.stroke });
+        }
+      }
+      if (updates.fill !== undefined) {
+        obj.customFill = updates.fill;
+        obj.set({ fill: updates.fill });
+      }
+      if (updates.strokeWidth !== undefined) {
+        obj.set({ strokeWidth: updates.strokeWidth });
+      }
+      if (updates.strokeDashArray !== undefined) {
+        obj.set({ strokeDashArray: updates.strokeDashArray });
+      }
+      if (updates.customStrokeStyle !== undefined) {
+        obj.customStrokeStyle = updates.customStrokeStyle;
+      }
+      if (updates.opacity !== undefined) {
+        obj.set({ opacity: updates.opacity });
+      }
+      if (updates.fontSize !== undefined) {
+        obj.set({ fontSize: updates.fontSize });
+      }
+    });
     fc.requestRenderAll();
+    fc.fire('object:modified'); // Trigger history snapshot
   };
 
-  const handleStrokeChange = (color) => {
+  const handleStroke = (color) => {
     setStroke(color);
-    updateObject('stroke', color);
+    updateSelection({ stroke: color });
   };
 
-  const handleFillChange = (color) => {
+  const handleFill = (color) => {
     setFill(color);
-    updateObject('fill', color);
+    updateSelection({ fill: color });
   };
 
-  const handleWidthChange = (w) => {
+  const handleWidth = (w) => {
     setStrokeWidth(w);
-    updateObject('strokeWidth', w);
+    updateSelection({ strokeWidth: w });
   };
 
-  const handleStyleChange = (style) => {
+  const handleStyle = (style) => {
     setStrokeStyle(style);
-    let dashArray = [];
-    if (style === 'dashed') dashArray = [8, 4];
-    if (style === 'dotted') dashArray = [2, 4];
-    updateObject('strokeDashArray', dashArray);
+    if (style === 'solid') updateSelection({ strokeDashArray: [], customStrokeStyle: 'solid' });
+    else if (style === 'dashed') updateSelection({ strokeDashArray: [8, 4], customStrokeStyle: 'dashed' });
+    else if (style === 'dotted') updateSelection({ strokeDashArray: [2, 4], customStrokeStyle: 'dotted' });
   };
 
-  const handleOpacityChange = (e) => {
-    const val = parseInt(e.target.value, 10) / 100;
-    setOpacity(val);
-    updateObject('opacity', val);
+  const handleOpacity = (e) => {
+    const v = parseInt(e.target.value);
+    setOpacity(v);
+    updateSelection({ opacity: v / 100 });
   };
+
+  const handleFontSize = (e) => {
+    const v = parseInt(e.target.value);
+    setFontSize(v);
+    updateSelection({ fontSize: v });
+  };
+
+  const handleDelete = () => {
+    if (!fabricCanvasRef || !fabricCanvasRef.current) return;
+    const fc = fabricCanvasRef.current;
+    fc.getActiveObjects().forEach(o => fc.remove(o));
+    fc.discardActiveObject();
+    fc.requestRenderAll();
+    fc.fire('object:modified');
+  };
+
+  const isText = activeObj && (activeObj.type === 'i-text' || activeObj.shapeType === 'text');
 
   return (
-    <div className="props-panel-wrapper">
-      <div className="props-panel">
-        
-        {/* Stroke Section */}
-        <div className="props-section">
-          <span className="props-label">Stroke</span>
-          <div className="props-section-row">
-            {PRESET_COLORS.map(c => (
-              <div 
-                key={c} 
-                className={`color-circle ${stroke === c ? 'active' : ''}`}
-                style={{ backgroundColor: c }}
-                onClick={() => handleStrokeChange(c)}
-              />
-            ))}
-            <div className="color-input-wrapper">
-              <input 
-                type="color" 
-                value={stroke !== 'transparent' ? stroke : '#ffffff'} 
-                onChange={(e) => handleStrokeChange(e.target.value)} 
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="props-divider" />
-
-        {/* Fill Section */}
-        <div className="props-section">
-          <span className="props-label">Fill</span>
-          <div className="props-section-row">
+    <div className="props-panel">
+      <div className="props-section">
+        <span className="props-label">STROKE COLOR</span>
+        <div className="props-row">
+          {PRESET_COLORS.map(c => (
             <div 
-              className={`color-circle none ${fill === 'transparent' ? 'active' : ''}`}
-              onClick={() => handleFillChange('transparent')}
-              title="None"
+              key={c}
+              className={`color-circle ${stroke === c ? 'active' : ''}`}
+              style={{ background: c, color: c }}
+              onClick={() => handleStroke(c)}
             />
-            {PRESET_COLORS.map(c => (
-              <div 
-                key={c} 
-                className={`color-circle ${fill === c ? 'active' : ''}`}
-                style={{ backgroundColor: c }}
-                onClick={() => handleFillChange(c)}
-              />
-            ))}
-            <div className="color-input-wrapper">
-              <input 
-                type="color" 
-                value={fill !== 'transparent' ? fill : '#ffffff'} 
-                onChange={(e) => handleFillChange(e.target.value)} 
-              />
-            </div>
-          </div>
+          ))}
+          <input 
+            type="color" 
+            className="color-input"
+            value={stroke && stroke !== 'transparent' ? stroke : '#f0ede8'}
+            onChange={e => handleStroke(e.target.value)}
+          />
         </div>
+      </div>
 
-        <div className="props-divider" />
+      <div className="props-section">
+        <span className="props-label">FILL COLOR</span>
+        <div className="props-row">
+          <div 
+            className={`color-circle none ${fill === 'transparent' ? 'active' : ''}`}
+            style={{ color: 'transparent' }}
+            onClick={() => handleFill('transparent')}
+          />
+          {PRESET_COLORS.map(c => (
+            <div 
+              key={c}
+              className={`color-circle ${fill === c ? 'active' : ''}`}
+              style={{ background: c, color: c }}
+              onClick={() => handleFill(c)}
+            />
+          ))}
+          <input 
+            type="color" 
+            className="color-input"
+            value={fill && fill !== 'transparent' ? fill : '#ffffff'}
+            onChange={e => handleFill(e.target.value)}
+          />
+        </div>
+      </div>
 
-        {/* Stroke Width Section */}
-        <div className="props-section-row">
-          <button className={`toggle-btn ${strokeWidth === 1.5 ? 'active' : ''}`} onClick={() => handleWidthChange(1.5)} title="Thin">
+      <div className="props-section">
+        <span className="props-label">STROKE WIDTH</span>
+        <div className="props-row">
+          <button className={`stroke-width-btn ${strokeWidth === 1 ? 'active' : ''}`} onClick={() => handleWidth(1)}>
             <div style={{ width: '16px', height: '1px', background: 'currentColor' }} />
           </button>
-          <button className={`toggle-btn ${strokeWidth === 3 ? 'active' : ''}`} onClick={() => handleWidthChange(3)} title="Mid">
+          <button className={`stroke-width-btn ${strokeWidth === 2 ? 'active' : ''}`} onClick={() => handleWidth(2)}>
             <div style={{ width: '16px', height: '2px', background: 'currentColor' }} />
           </button>
-          <button className={`toggle-btn ${strokeWidth === 5 ? 'active' : ''}`} onClick={() => handleWidthChange(5)} title="Thick">
-            <div style={{ width: '16px', height: '4px', background: 'currentColor' }} />
+          <button className={`stroke-width-btn ${strokeWidth === 3.5 ? 'active' : ''}`} onClick={() => handleWidth(3.5)}>
+            <div style={{ width: '16px', height: '3.5px', background: 'currentColor' }} />
           </button>
         </div>
+      </div>
 
-        <div className="props-divider" />
-
-        {/* Stroke Style Section */}
-        <div className="props-section-row">
-          <button className={`toggle-btn ${strokeStyle === 'solid' ? 'active' : ''}`} onClick={() => handleStyleChange('solid')} title="Solid">
-            <svg width="20" height="4" viewBox="0 0 20 4"><line x1="0" y1="2" x2="20" y2="2" stroke="currentColor" strokeWidth="2" /></svg>
+      <div className="props-section">
+        <span className="props-label">STROKE STYLE</span>
+        <div className="props-row">
+          <button className={`stroke-style-btn ${strokeStyle === 'solid' ? 'active' : ''}`} onClick={() => handleStyle('solid')}>
+             <div style={{ width: '16px', height: '1px', background: 'currentColor' }} />
           </button>
-          <button className={`toggle-btn ${strokeStyle === 'dashed' ? 'active' : ''}`} onClick={() => handleStyleChange('dashed')} title="Dashed">
-            <svg width="20" height="4" viewBox="0 0 20 4"><line x1="0" y1="2" x2="20" y2="2" stroke="currentColor" strokeWidth="2" strokeDasharray="4 2" /></svg>
+          <button className={`stroke-style-btn ${strokeStyle === 'dashed' ? 'active' : ''}`} onClick={() => handleStyle('dashed')}>
+             <div style={{ width: '16px', borderBottom: '1px dashed currentColor' }} />
           </button>
-          <button className={`toggle-btn ${strokeStyle === 'dotted' ? 'active' : ''}`} onClick={() => handleStyleChange('dotted')} title="Dotted">
-            <svg width="20" height="4" viewBox="0 0 20 4"><line x1="0" y1="2" x2="20" y2="2" stroke="currentColor" strokeWidth="2" strokeDasharray="1 3" strokeLinecap="round" /></svg>
+          <button className={`stroke-style-btn ${strokeStyle === 'dotted' ? 'active' : ''}`} onClick={() => handleStyle('dotted')}>
+             <div style={{ width: '16px', borderBottom: '1px dotted currentColor' }} />
           </button>
         </div>
+      </div>
 
-        <div className="props-divider" />
+      <div className="props-section">
+        <span className="props-label">OPACITY</span>
+        <div className="props-row">
+          <input type="range" className="opacity-slider" min="0" max="100" step="1" value={opacity} onChange={handleOpacity} />
+          <span className="opacity-value">{opacity}%</span>
+        </div>
+      </div>
 
-        {/* Opacity Section */}
+      {isText && (
         <div className="props-section">
-          <span className="props-label">Opacity</span>
-          <div className="opacity-slider">
-            <input 
-              type="range" 
-              min="0" 
-              max="100" 
-              value={Math.round(opacity * 100)} 
-              onChange={handleOpacityChange} 
-            />
-            <span className="opacity-value">{Math.round(opacity * 100)}%</span>
+          <span className="props-label">FONT SIZE</span>
+          <div className="props-row">
+            <select className="font-size-select" value={fontSize} onChange={handleFontSize}>
+              {[12, 14, 16, 18, 24, 32, 48].map(s => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
           </div>
         </div>
+      )}
 
-      </div>
+      <button className="delete-btn" onClick={handleDelete}>
+        <Trash2 size={14} />
+      </button>
     </div>
   );
 }

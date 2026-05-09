@@ -22,6 +22,9 @@ export default function SketchCanvas({
   const historyRef = useRef(createHistory());
   const saveTimeoutRef = useRef(null);
 
+  const activeTool = useCanvasStore((state) => state.activeTool);
+  const [eraserPos, setEraserPos] = useState({ x: -100, y: -100 });
+
   useEffect(() => {
     if (!containerRef.current || !canvasRef.current) return;
 
@@ -106,6 +109,9 @@ export default function SketchCanvas({
     let startPos = null;
     let previewShape = null;
 
+    let isPanning = false;
+    let lastClientX, lastClientY;
+
     const cleanupPreview = () => {
       if (previewShape) {
         fc.remove(previewShape);
@@ -114,16 +120,33 @@ export default function SketchCanvas({
     };
 
     fc.on('mouse:down', (opt) => {
-      const activeTool = useCanvasStore.getState().activeTool;
-      if (activeTool === 'select' || activeTool === 'hand' || activeTool === 'pencil' || activeTool === 'text') {
-        if (activeTool === 'text' && !opt.target) {
+      const currentTool = useCanvasStore.getState().activeTool;
+      
+      if (opt.e.button === 1 || currentTool === 'hand') {
+        isPanning = true;
+        fc.selection = false;
+        lastClientX = opt.e.clientX;
+        lastClientY = opt.e.clientY;
+        if (currentTool === 'hand') {
+          fc.defaultCursor = 'grabbing';
+          fc.hoverCursor = 'grabbing';
+          fc.requestRenderAll();
+        }
+        return;
+      }
+      
+      if (currentTool === 'eraser') {
+        return; // handle erasing in mouse:move
+      }
+
+      if (currentTool === 'select' || currentTool === 'pencil' || currentTool === 'text') {
+        if (currentTool === 'text' && !opt.target) {
           const ptr = fc.getPointer(opt.e);
           drawText(fc, ptr.x, ptr.y);
           useCanvasStore.getState().setActiveTool('select');
         }
         return;
       }
-      if (opt.e.button === 1) return; // Middle mouse is handled by panning
       
       // We are starting a shape drawing
       isDrawing = true;
@@ -132,9 +155,36 @@ export default function SketchCanvas({
     });
 
     fc.on('mouse:move', (opt) => {
+      const currentTool = useCanvasStore.getState().activeTool;
+
+      if (isPanning) {
+        const vpt = fc.viewportTransform;
+        vpt[4] += opt.e.clientX - lastClientX;
+        vpt[5] += opt.e.clientY - lastClientY;
+        fc.requestRenderAll();
+        lastClientX = opt.e.clientX;
+        lastClientY = opt.e.clientY;
+        return;
+      }
+
+      if (currentTool === 'eraser' && opt.e.buttons === 1) {
+        const pointer = fc.getPointer(opt.e);
+        const toRemove = fc.getObjects().filter(obj => {
+          if (!obj.id || !obj.shapeType) return false;
+          const b = obj.getBoundingRect(true, true);
+          const cx = b.left + b.width / 2;
+          const cy = b.top + b.height / 2;
+          return Math.hypot(pointer.x - cx, pointer.y - cy) < 30;
+        });
+        if (toRemove.length > 0) {
+          toRemove.forEach(o => fc.remove(o));
+          fc.requestRenderAll();
+        }
+        return;
+      }
+
       if (!isDrawing || !startPos) return;
-      const activeTool = useCanvasStore.getState().activeTool;
-      if (['select', 'hand', 'pencil', 'text'].includes(activeTool)) return;
+      if (['select', 'hand', 'eraser', 'pencil', 'text'].includes(currentTool)) return;
 
       const currentPos = fc.getPointer(opt.e);
       const w = currentPos.x - startPos.x;
@@ -152,25 +202,14 @@ export default function SketchCanvas({
         opts.fill = fillColor;
       }
 
-      // Generate preview without adding it properly to active object/etc
-      // We will draw it directly. For tools, we need to handle negative width/height logic carefully.
-      // But for preview, we can just use the tools functions, and immediately remove them.
-      // A better way is to pass a preview flag, but since our tools add and set active,
-      // we need a slightly modified approach for preview, or we just rely on quick add/remove.
-      // Let's rely on quick add/remove but turn off setActiveObject for preview.
-      // Wait, our tools functions call setActiveObject. We should intercept or just remove it.
-      
-      // Simple preview logic: Use standard fabric shapes for preview to avoid roughjs overhead on every frame, 
-      // or just draw roughjs. Roughjs might be fast enough.
-      // To prevent tools from messing up selection, we'll draw native fabric shapes for preview.
       let preview;
-      if (activeTool === 'rect') {
+      if (currentTool === 'rect') {
         preview = new fabric.Rect({ left: Math.min(startPos.x, currentPos.x), top: Math.min(startPos.y, currentPos.y), width: Math.abs(w), height: Math.abs(h), stroke: strokeColor, fill: 'transparent', selectable: false });
-      } else if (activeTool === 'ellipse') {
+      } else if (currentTool === 'ellipse') {
         preview = new fabric.Ellipse({ left: Math.min(startPos.x, currentPos.x), top: Math.min(startPos.y, currentPos.y), rx: Math.abs(w)/2, ry: Math.abs(h)/2, stroke: strokeColor, fill: 'transparent', selectable: false });
-      } else if (activeTool === 'diamond') {
+      } else if (currentTool === 'diamond') {
         preview = new fabric.Polygon([ {x: w/2, y: 0}, {x: w, y: h/2}, {x: w/2, y: h}, {x: 0, y: h/2} ], { left: Math.min(startPos.x, currentPos.x), top: Math.min(startPos.y, currentPos.y), stroke: strokeColor, fill: 'transparent', selectable: false });
-      } else if (activeTool === 'line' || activeTool === 'arrow') {
+      } else if (currentTool === 'line' || currentTool === 'arrow') {
         preview = new fabric.Line([startPos.x, startPos.y, currentPos.x, currentPos.y], { stroke: strokeColor, selectable: false });
       }
 
@@ -182,6 +221,23 @@ export default function SketchCanvas({
     });
 
     fc.on('mouse:up', (opt) => {
+      const currentTool = useCanvasStore.getState().activeTool;
+      
+      if (isPanning) {
+        isPanning = false;
+        fc.setViewportTransform(fc.viewportTransform);
+        if (currentTool === 'hand') {
+          fc.defaultCursor = 'grab';
+          fc.hoverCursor = 'grab';
+          fc.requestRenderAll();
+        }
+        return;
+      }
+      
+      if (currentTool === 'eraser') {
+        return;
+      }
+
       if (!isDrawing || !startPos) return;
       isDrawing = false;
       cleanupPreview();
@@ -190,7 +246,6 @@ export default function SketchCanvas({
       const w = endPos.x - startPos.x;
       const h = endPos.y - startPos.y;
 
-      const activeTool = useCanvasStore.getState().activeTool;
       const { strokeColor, strokeWidth, fillColor } = useCanvasStore.getState();
       const opts = { stroke: strokeColor, strokeWidth };
       if (fillColor && fillColor !== 'transparent') {
@@ -203,15 +258,15 @@ export default function SketchCanvas({
         return;
       }
 
-      if (activeTool === 'rect') {
+      if (currentTool === 'rect') {
         drawRect(fc, Math.min(startPos.x, endPos.x), Math.min(startPos.y, endPos.y), Math.abs(w), Math.abs(h), opts);
-      } else if (activeTool === 'ellipse') {
+      } else if (currentTool === 'ellipse') {
         drawEllipse(fc, startPos.x + w/2, startPos.y + h/2, Math.abs(w)/2, Math.abs(h)/2, opts);
-      } else if (activeTool === 'diamond') {
+      } else if (currentTool === 'diamond') {
         drawDiamond(fc, Math.min(startPos.x, endPos.x), Math.min(startPos.y, endPos.y), Math.abs(w), Math.abs(h), opts);
-      } else if (activeTool === 'line') {
+      } else if (currentTool === 'line') {
         drawLine(fc, startPos.x, startPos.y, endPos.x, endPos.y, opts);
-      } else if (activeTool === 'arrow') {
+      } else if (currentTool === 'arrow') {
         drawArrow(fc, startPos.x, startPos.y, endPos.x, endPos.y, opts);
       }
 
@@ -248,26 +303,64 @@ export default function SketchCanvas({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [diagramId]);
 
-  // Subscribe to tool changes to handle pencil mode
+  // Handle active tool changes (cursor + pencil freehand)
   useEffect(() => {
-    if (!fcRef.current) return;
-    const unsub = useCanvasStore.subscribe(
-      (state) => state.activeTool,
-      (activeTool) => {
-        if (activeTool === 'pencil') {
-          const { strokeColor, strokeWidth } = useCanvasStore.getState();
-          startFreehand(fcRef.current, { stroke: strokeColor, strokeWidth });
-        } else {
-          endFreehand(fcRef.current);
-        }
-      }
-    );
-    return () => unsub();
-  }, []);
+    const fc = fcRef.current;
+    if (!fc) return;
+
+    if (activeTool === 'select') {
+      fc.isDrawingMode = false;
+      fc.selection = true;
+      fc.defaultCursor = 'default';
+      fc.hoverCursor = 'move';
+      endFreehand(fc);
+    } else if (activeTool === 'hand') {
+      fc.isDrawingMode = false;
+      fc.selection = false;
+      fc.defaultCursor = 'grab';
+      fc.hoverCursor = 'grab';
+      endFreehand(fc);
+    } else if (activeTool === 'eraser') {
+      fc.isDrawingMode = false;
+      fc.selection = false;
+      fc.defaultCursor = 'none';
+      fc.hoverCursor = 'none';
+      endFreehand(fc);
+    } else if (activeTool === 'pencil') {
+      fc.isDrawingMode = false; // startFreehand handles its own drawing logic
+      fc.selection = false;
+      fc.defaultCursor = 'crosshair';
+      fc.hoverCursor = 'crosshair';
+      const { strokeColor, strokeWidth } = useCanvasStore.getState();
+      startFreehand(fc, { stroke: strokeColor, strokeWidth });
+    } else if (activeTool === 'text') {
+      fc.isDrawingMode = false;
+      fc.selection = false;
+      fc.defaultCursor = 'text';
+      fc.hoverCursor = 'text';
+      endFreehand(fc);
+    } else {
+      // Shapes
+      fc.isDrawingMode = false;
+      fc.selection = false;
+      fc.defaultCursor = 'crosshair';
+      fc.hoverCursor = 'crosshair';
+      endFreehand(fc);
+    }
+    
+    fc.requestRenderAll();
+  }, [activeTool]);
+
+  const handleNativeMouseMove = (e) => {
+    if (activeTool === 'eraser') {
+      setEraserPos({ x: e.clientX, y: e.clientY });
+    }
+  };
 
   return (
     <div 
       ref={containerRef} 
+      onMouseMove={handleNativeMouseMove}
       style={{
         flex: 1,
         height: '100%',
@@ -277,6 +370,22 @@ export default function SketchCanvas({
       }}
     >
       <canvas ref={canvasRef} style={{ display: 'block' }} />
+      
+      {activeTool === 'eraser' && (
+        <div style={{
+          position: 'fixed',
+          pointerEvents: 'none',
+          zIndex: 998,
+          width: '32px',
+          height: '32px',
+          borderRadius: '50%',
+          border: '1.5px solid rgba(240,237,232,0.6)',
+          background: 'rgba(240,237,232,0.05)',
+          transform: `translate(${eraserPos.x - 16}px, ${eraserPos.y - 16}px)`,
+          left: 0,
+          top: 0
+        }} />
+      )}
     </div>
   );
 }
