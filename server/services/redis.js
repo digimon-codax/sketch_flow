@@ -1,10 +1,10 @@
 import Redis from "ioredis";
 
 const redisConfig = {
-  host: "redis-18132.crce206.ap-south-1-1.ec2.cloud.redislabs.com",
-  port: 18132,
+  host: "redis-14549.crce286.ap-south-1-1.ec2.cloud.redislabs.com",
+  port: 14549,
   username: "default",
-  password: "TOy1mf67CXONeI0z97lCo2uFci0PQchC",
+  password: "R5XJfG3px5sSmq1lBZiS8a00G4Iz6iUD",
   retryStrategy: (times) => Math.min(times * 500, 5000),
   enableOfflineQueue: true,
 };

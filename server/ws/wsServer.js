@@ -26,11 +26,12 @@ export function initWSServer(httpServer) {
   const wss = new WebSocketServer({ server: httpServer });
   console.log("🔌 WebSocket server initialized");
 
-  // ── Redis fan-out ─────────────────────────────────────────────────────────
   // Subscribe to all room channels using pattern subscribe
   sub.psubscribe("room:*", (err) => {
     if (err) console.error("❌ psubscribe error:", err.message);
     else console.log("✅ Redis sub listening on room:*");
+  }).catch((err) => {
+    console.error("❌ psubscribe promise rejection:", err.message);
   });
 
   sub.on("pmessage", (_pattern, channel, rawMessage) => {
