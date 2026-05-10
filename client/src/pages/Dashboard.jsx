@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Search, Edit2, Copy, Trash2 } from 'lucide-react';
 import api from '../api/index';
 import { useAuthStore } from '../store/authStore';
+import '../styles/landing.css';
 
 function timeAgo(dateStr) {
   const diff = (Date.now() - new Date(dateStr)) / 1000;
@@ -219,7 +220,8 @@ export default function Dashboard() {
   });
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg-base)', fontFamily: 'Inter, sans-serif' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg-base)', fontFamily: 'Inter, sans-serif', position: 'relative', overflowX: 'hidden' }}>
+      <div className="starry-bg"></div>
       {/* ── Inline styles ─────────────────────────────────── */}
       <style>{`
         .card-title-row:hover .rename-btn { opacity: 1 !important; }
@@ -229,13 +231,16 @@ export default function Dashboard() {
 
       {/* ── Header ──────────────────────────────────────── */}
       <header style={{
-        background: 'var(--bg-surface)',
-        borderBottom: '1px solid var(--border)',
+        background: 'rgba(0, 0, 0, 0.5)',
+        backdropFilter: 'blur(10px)',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
         padding: '0 24px',
-        height: 52,
+        height: 60,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
+        position: 'relative',
+        zIndex: 10,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="var(--accent)">
@@ -260,31 +265,31 @@ export default function Dashboard() {
       <main style={{ maxWidth: 1040, margin: '0 auto', padding: '40px 24px' }}>
 
         {/* Title + New */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 28 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 60, position: 'relative', zIndex: 10 }}>
           <div>
-            <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'Syne', margin: 0 }}>
-              My Diagrams
+            <h1 className="heading-display" style={{ fontSize: 'clamp(40px, 6vw, 80px)', lineHeight: 0.9, letterSpacing: '-0.03em', margin: 0, display: 'flex', flexDirection: 'column' }}>
+              <span className="text-outline">YOUR</span>
+              <span className="text-solid">DIAGRAMS</span>
             </h1>
-            <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
-              {diagrams.length} diagram{diagrams.length !== 1 ? 's' : ''}
+            <p style={{ fontSize: 16, color: 'var(--text-secondary)', marginTop: 16, fontWeight: 500 }}>
+              {diagrams.length} diagram{diagrams.length !== 1 ? 's' : ''} in orbit
             </p>
           </div>
           <button
             onClick={() => setShowNew(true)}
+            className="nav-btn-outline"
             style={{
-              background: 'var(--accent)', color: '#0d0d0d',
-              fontWeight: 600, padding: '9px 18px',
-              borderRadius: 'var(--radius-sm)', fontSize: 13,
-              border: 'none', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', gap: 6,
+              background: 'transparent', color: 'var(--text-primary)',
+              border: 'none', cursor: 'pointer', outline: 'none',
+              marginTop: '16px'
             }}
           >
-            <span style={{ fontSize: 16, lineHeight: 1 }}>+</span> New diagram
+            + New Diagram
           </button>
         </div>
 
         {/* Search + Sort */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 40, position: 'relative', zIndex: 10 }}>
           <div style={{ position: 'relative', flex: 1, maxWidth: 320 }}>
             <Search
               size={14}
@@ -324,14 +329,41 @@ export default function Dashboard() {
             <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
           </div>
         ) : diagrams.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '80px 0' }}>
-            <div style={{ fontSize: 48, marginBottom: 16 }}>🎨</div>
-            <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>No diagrams yet.</p>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '100px 0', position: 'relative', zIndex: 10 }}>
+            <div style={{ position: 'relative', width: 140, height: 140, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }} onClick={() => setShowNew(true)} className="empty-orbit-btn">
+              <style>{`
+                .empty-orbit-btn::before {
+                  content: '';
+                  position: absolute;
+                  top: 0; left: 0; right: 0; bottom: 0;
+                  border: 2px dashed rgba(255, 90, 0, 0.4);
+                  border-radius: 50%;
+                  animation: spin 10s linear infinite;
+                }
+                .empty-orbit-btn:hover::before {
+                  border: 2px solid var(--accent);
+                  animation: spin 3s linear infinite;
+                }
+                .empty-core {
+                  width: 24px; height: 24px;
+                  background: var(--accent);
+                  border-radius: 50%;
+                  box-shadow: 0 0 24px var(--accent);
+                  transition: transform 0.3s ease;
+                }
+                .empty-orbit-btn:hover .empty-core {
+                  transform: scale(1.8);
+                }
+              `}</style>
+              <div className="empty-core"></div>
+            </div>
+            <h2 className="heading-display" style={{ marginTop: 48, fontSize: 'clamp(24px, 4vw, 40px)', color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>THE CANVAS IS EMPTY</h2>
             <button
               onClick={() => setShowNew(true)}
-              style={{ marginTop: 12, background: 'none', border: 'none', color: 'var(--accent)', fontSize: 13, cursor: 'pointer', fontWeight: 600 }}
+              className="nav-btn-outline"
+              style={{ marginTop: 32, background: 'transparent', border: 'none', cursor: 'pointer', outline: 'none' }}
             >
-              Create your first diagram →
+              Start Your Journey
             </button>
           </div>
         ) : displayDiagrams.length === 0 ? (
@@ -343,7 +375,7 @@ export default function Dashboard() {
             </p>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 24, position: 'relative', zIndex: 10 }}>
             {displayDiagrams.map(d => {
               const isOwner = d.members?.some(m => {
                 const mId = (m.userId?._id ?? m.userId)?.toString();
@@ -356,21 +388,24 @@ export default function Dashboard() {
                   className="dash-card"
                   onClick={() => navigate(`/d/${d._id}`)}
                   style={{
-                    background: 'var(--bg-surface)',
-                    border: '1px solid var(--border)',
+                    background: 'rgba(18, 18, 18, 0.7)',
+                    backdropFilter: 'blur(8px)',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
                     borderRadius: 'var(--radius)',
                     padding: '16px',
                     cursor: 'pointer',
                     position: 'relative',
-                    transition: 'border-color 0.15s, box-shadow 0.15s',
+                    transition: 'all 0.3s ease',
                   }}
                   onMouseEnter={e => {
-                    e.currentTarget.style.borderColor = 'var(--border-focus)';
-                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.borderColor = 'var(--accent)';
+                    e.currentTarget.style.transform = 'translateY(-4px)';
+                    e.currentTarget.style.boxShadow = '0 12px 24px rgba(255, 90, 0, 0.15)';
                   }}
                   onMouseLeave={e => {
-                    e.currentTarget.style.borderColor = 'var(--border)';
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
                     e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = 'none';
                   }}
                 >
                   {/* Shared badge */}
