@@ -1,6 +1,9 @@
 import { create } from 'zustand';
 
 export const useCanvasStore = create((set) => ({
+  canvasMode: 'diagram', // 'diagram' | 'art'
+  setCanvasMode: (mode) => set({ canvasMode: mode }),
+
   elements: [],
   setElements: (els) => set({ elements: els }),
   

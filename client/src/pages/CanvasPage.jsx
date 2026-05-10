@@ -59,6 +59,8 @@ export default function CanvasPage() {
   const ws = useWebSocket(import.meta.env.VITE_WS_URL || 'ws://localhost:3001');
   useCollaboration(fabricCanvasRef, id, ws);
 
+  const canvasMode = useCanvasStore(s => s.canvasMode);
+
   useEffect(() => {
     let isMounted = true;
     const fetchDiagram = async () => {
@@ -258,23 +260,33 @@ export default function CanvasPage() {
           </div>
         )}
 
-        <PropertiesPanel canvasReady={canvasReady} />
-        <CollabCursors />
-        <ContextDrawer diagramId={id} isReadOnly={isReadOnly} />
-        <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-          <LeftToolbar />
-          <SketchCanvas 
-            diagramId={id}
-            initialElements={diagram?.elements}
-            setSaveState={setSaveState}
-            setHistoryRef={(h) => historyRef.current = h}
-            setFabricCanvasRef={(ref) => { 
-              fabricCanvasRef.current = ref.current; 
-              setCanvasReady(true);
-            }} 
-          />
-        </div>
-        <AssistPanel />
+        {canvasMode === 'diagram' ? (
+          <>
+            <PropertiesPanel canvasReady={canvasReady} />
+            <CollabCursors />
+            <ContextDrawer diagramId={id} isReadOnly={isReadOnly} />
+            <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+              <LeftToolbar />
+              <SketchCanvas 
+                diagramId={id}
+                initialElements={diagram?.elements}
+                setSaveState={setSaveState}
+                setHistoryRef={(h) => historyRef.current = h}
+                setFabricCanvasRef={(ref) => { 
+                  fabricCanvasRef.current = ref.current; 
+                  setCanvasReady(true);
+                }} 
+              />
+            </div>
+            <AssistPanel />
+          </>
+        ) : (
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-base)' }}>
+            <h2 style={{ color: 'var(--text-hint)', fontFamily: 'Syne, sans-serif', fontSize: '24px', fontWeight: 500 }}>
+              Art Mode Coming Soon
+            </h2>
+          </div>
+        )}
 
         {/* Shortcuts Help Button */}
         <button 

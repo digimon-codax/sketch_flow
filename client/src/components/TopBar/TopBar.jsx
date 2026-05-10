@@ -6,6 +6,7 @@ import { CanvasContext } from '../../canvas/SketchCanvas';
 import { useCleanup } from '../../features/cleanup/useCleanup';
 import { useArchAssist } from '../../features/assist/useArchAssist';
 import { useCanvasStore } from '../../store/canvasStore';
+import ModeSwitcher from '../ModeSwitcher/ModeSwitcher';
 import './TopBar.css';
 
 const DiamondLogo = () => (
@@ -286,6 +287,7 @@ export default function TopBar({ diagramId, diagramName, saveState }) {
   const { run: runCleanup, loading: cleanupLoading } = useCleanup(fabricCanvasRef);
   const { run: runAssist,  loading: assistLoading  } = useArchAssist(fabricCanvasRef);
   const userRole = useCanvasStore(s => s.userRole);
+  const canvasMode = useCanvasStore(s => s.canvasMode);
   const navigate = useNavigate();
 
   useEffect(() => { if (diagramName) setName(diagramName); }, [diagramName]);
@@ -388,10 +390,12 @@ export default function TopBar({ diagramId, diagramName, saveState }) {
           )}
         </div>
 
-        {/* Center — hide AI buttons for viewer */}
-        <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '8px' }}>
-          {userRole !== 'viewer' && (
-            <>
+        {/* Center — Mode switcher and AI buttons */}
+        <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '16px', alignItems: 'center' }}>
+          <ModeSwitcher />
+          
+          {userRole !== 'viewer' && canvasMode === 'diagram' && (
+            <div style={{ display: 'flex', gap: '8px' }}>
               <button
                 className={`feature-btn ${cleanupLoading ? 'loading' : ''}`}
                 onClick={runCleanup}
@@ -408,7 +412,7 @@ export default function TopBar({ diagramId, diagramName, saveState }) {
                 {assistLoading ? spinnerEl : <BrainCircuit size={14} />}
                 {assistLoading ? 'Analyzing...' : 'Assist'}
               </button>
-            </>
+            </div>
           )}
         </div>
 
