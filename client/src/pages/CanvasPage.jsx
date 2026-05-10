@@ -12,6 +12,7 @@ import TopBar from '../components/TopBar/TopBar';
 import CollabCursors from '../components/CollabCursors/CollabCursors';
 import ContextDrawer from '../components/Features/ContextLayer/ContextDrawer';
 import AssistPanel from '../features/assist/AssistPanel';
+import ArtCanvas from '../art/ArtCanvas';
 import { deserializeCanvas } from '../canvas/serialize';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { useCollaboration } from '../hooks/useCollaboration';
@@ -55,6 +56,7 @@ export default function CanvasPage() {
   const fabricCanvasRef = useRef(null);
   const historyRef = useRef(null);
   const clipboardRef = useRef([]);
+  const artCanvasRef = useRef(null);
 
   const ws = useWebSocket(import.meta.env.VITE_WS_URL || 'ws://localhost:3001');
   useCollaboration(fabricCanvasRef, id, ws);
@@ -281,10 +283,8 @@ export default function CanvasPage() {
             <AssistPanel />
           </>
         ) : (
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-base)' }}>
-            <h2 style={{ color: 'var(--text-hint)', fontFamily: 'Syne, sans-serif', fontSize: '24px', fontWeight: 500 }}>
-              Art Mode Coming Soon
-            </h2>
+          <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+            <ArtCanvas ref={artCanvasRef} />
           </div>
         )}
 
