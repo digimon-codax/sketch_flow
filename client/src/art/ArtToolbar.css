@@ -1,0 +1,146 @@
+.art-toolbar {
+  width: 52px;
+  height: 100%;
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 0;
+  gap: 4px;
+  z-index: 50;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.art-toolbar::-webkit-scrollbar {
+  display: none;
+}
+
+.toolbar-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+
+.tool-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  position: relative;
+  background: transparent;
+  transition: all 0.1s ease;
+  border: none;
+  cursor: pointer;
+}
+
+.tool-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.tool-btn.active {
+  background: var(--accent-dim);
+  color: var(--accent);
+  border: 1px solid rgba(212, 168, 83, 0.3);
+}
+
+.tool-separator {
+  height: 4px;
+  border-top: 1px solid var(--border);
+  width: 28px;
+  margin: 4px 0;
+  flex-shrink: 0;
+}
+
+/* Tooltip styles */
+.tool-tooltip {
+  position: absolute;
+  left: 44px;
+  white-space: nowrap;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
+  z-index: 1000;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(-5px);
+  transition: all 0.15s ease;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tool-btn:hover .tool-tooltip {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.tool-tooltip-key {
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--text-hint);
+  font-size: 10px;
+}
+
+/* Specifics for ArtToolbar */
+.size-section {
+  padding: 8px 0;
+  gap: 12px;
+}
+
+.size-slider {
+  -webkit-appearance: slider-vertical;
+  width: 4px;
+  height: 80px;
+  cursor: pointer;
+  accent-color: var(--accent-bright);
+}
+
+.size-preview {
+  border-radius: 50%;
+  transition: all 0.1s ease;
+}
+
+.symmetry-btn {
+  width: 28px;
+  height: 28px;
+}
+
+.radial-lines-input {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  margin-top: 4px;
+}
+
+.radial-lines-input input {
+  width: 32px;
+  height: 20px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  text-align: center;
+  font-size: 11px;
+}
+
+.zoom-display {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-hint);
+  margin-bottom: 8px;
+}
+
+.color-picker-btn {
+  overflow: hidden;
+}
