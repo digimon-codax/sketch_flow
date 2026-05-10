@@ -10,6 +10,7 @@ const BRUSHES = [
   { id: 'charcoal', icon: Wind, key: 'C', label: 'Charcoal' },
   { id: 'eraser', icon: Eraser, key: 'E', label: 'Eraser' },
   { id: 'smudge', icon: Blend, key: 'S', label: 'Smudge' },
+  { id: 'eyedropper', icon: Pipette, key: 'Alt', label: 'Eyedropper' },
 ];
 
 const SYMMETRY_MODES = [
@@ -23,14 +24,20 @@ const SYMMETRY_MODES = [
 export default function ArtToolbar() {
   const { 
     brushType, setBrushType, 
-    brushSize, setBrushSize, 
-    brushColor, setBrushColor,
+    brushSize, setBrushSize,
+    brushColor,
     symmetryMode, setSymmetryMode,
     symmetryLines, setSymmetryLines,
     undoStroke, redoStroke
   } = useArtStore();
   
   const previousTool = useRef(brushType);
+
+  // Track last non-eyedropper tool for alt-key revert
+  const handleSetBrushType = (type) => {
+    if (type !== 'eyedropper') previousTool.current = type;
+    setBrushType(type);
+  };
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -49,31 +56,27 @@ export default function ArtToolbar() {
       }
 
       switch (key) {
-        case 'p': setBrushType('pencil'); break;
-        case 'i': setBrushType('ink'); break;
-        case 'w': setBrushType('watercolor'); break;
-        case 'c': setBrushType('charcoal'); break;
-        case 'e': setBrushType('eraser'); break;
-        case 's': setBrushType('smudge'); break;
+        case 'p': handleSetBrushType('pencil'); break;
+        case 'i': handleSetBrushType('ink'); break;
+        case 'w': handleSetBrushType('watercolor'); break;
+        case 'c': handleSetBrushType('charcoal'); break;
+        case 'e': handleSetBrushType('eraser'); break;
+        case 's': handleSetBrushType('smudge'); break;
         case '[': setBrushSize(Math.max(1, brushSize - 5)); break;
         case ']': setBrushSize(Math.min(100, brushSize + 5)); break;
       }
     };
 
     const handleAltDown = (e) => {
-      // Switch to a temporary picker mode when Alt is held
-      if (e.key === 'Alt' && useArtStore.getState().brushType !== 'picker') {
+      if (e.key === 'Alt' && useArtStore.getState().brushType !== 'eyedropper') {
         previousTool.current = useArtStore.getState().brushType;
-        // Optional: Could implement a custom pipet brush type here if needed
-        // setBrushType('picker');
+        setBrushType('eyedropper');
       }
     };
 
     const handleAltUp = (e) => {
-      if (e.key === 'Alt') {
-        if (previousTool.current && useArtStore.getState().brushType === 'picker') {
-          setBrushType(previousTool.current);
-        }
+      if (e.key === 'Alt' && useArtStore.getState().brushType === 'eyedropper') {
+        setBrushType(previousTool.current || 'pencil');
       }
     };
 
@@ -99,7 +102,7 @@ export default function ArtToolbar() {
             <button
               key={tool.id}
               className={`tool-btn ${isActive ? 'active' : ''}`}
-              onClick={() => setBrushType(tool.id)}
+              onClick={() => handleSetBrushType(tool.id)}
             >
               <Icon size={16} />
               <div className="tool-tooltip">
@@ -109,22 +112,8 @@ export default function ArtToolbar() {
             </button>
           );
         })}
-        
-        {/* Color Picker Native */}
-        <label className="tool-btn color-picker-btn">
-          <Pipette size={16} />
-          <input 
-            type="color" 
-            value={brushColor}
-            onChange={(e) => setBrushColor(e.target.value)}
-            style={{ opacity: 0, position: 'absolute', width: '100%', height: '100%', cursor: 'pointer' }}
-          />
-          <div className="tool-tooltip">
-            <span>Color Picker</span>
-            <span className="tool-tooltip-key">Alt</span>
-          </div>
-        </label>
       </div>
+
 
       <div className="tool-separator" />
 

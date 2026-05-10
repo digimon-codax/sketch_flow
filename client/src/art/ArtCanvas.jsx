@@ -11,6 +11,8 @@ const ArtCanvas = forwardRef((props, ref) => {
   const lastPoint = useRef(null);
   const currentPath = useRef([]);
   const strokeSnapshot = useRef(null);
+  const prevToolRef = useRef('pencil');    // tracks last non-eyedropper tool for revert
+  const persistedArtworkRef = useRef(null); // ground-truth of committed artwork as dataURL
 
   // ─── INIT & RESIZE ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -22,50 +24,49 @@ const ArtCanvas = forwardRef((props, ref) => {
 
     let resizeTimer;
 
-    const resizeCanvases = (entries) => {
-      const rect = container.getBoundingClientRect();
-      // Use Math.floor to prevent floating point mismatch with canvas width/height properties
-      const newWidth = Math.floor(rect.width);
-      const newHeight = Math.floor(rect.height);
+    const applyResize = (newWidth, newHeight) => {
+      // Use persistedArtworkRef as the source of truth — NOT canvas.toDataURL()
+      // This ensures we restore correctly even if the canvas was already wiped.
+      const dataURL = persistedArtworkRef.current;
 
-      // Don't resize if layout hasn't settled
-      if (newWidth <= 0 || newHeight <= 0) return;
-      if (compCanvas.width === newWidth && compCanvas.height === newHeight) return;
-
-      // CRITICAL: Capture the image data URL BEFORE resizing
-      // We use a synchronous snapshot so we don't race with the canvas being cleared
-      const dataURL = (compCanvas.width > 0 && compCanvas.height > 0)
-        ? compCanvas.toDataURL()
-        : null;
-
-      // Resize canvases (this wipes both of them)
       compCanvas.width = newWidth;
       compCanvas.height = newHeight;
       actCanvas.width = newWidth;
       actCanvas.height = newHeight;
 
       const ctx = compCanvas.getContext('2d');
-      
-      // Fill with white background
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, newWidth, newHeight);
 
-      // Restore saved drawing — MUST set onload BEFORE src so it fires on data URLs
       if (dataURL) {
-        const savedImage = new Image();
-        savedImage.onload = () => {
-          ctx.drawImage(savedImage, 0, 0);
-        };
-        savedImage.src = dataURL;  // triggers onload (sync or async depending on browser)
+        const img = new Image();
+        img.onload = () => ctx.drawImage(img, 0, 0); // onload set BEFORE src
+        img.src = dataURL;
       }
     };
 
-    // Use ResizeObserver to catch layout shifts
-    const observer = new ResizeObserver((entries) => {
+    const resizeCanvases = () => {
+      const rect = container.getBoundingClientRect();
+      const newWidth = Math.floor(rect.width);
+      const newHeight = Math.floor(rect.height);
+
+      if (newWidth <= 0 || newHeight <= 0) return;
+
+      // Only resize if dimensions changed by more than 2px — prevents sub-pixel
+      // float noise from react-colorful or flex reflows triggering unnecessary wipes.
+      const widthDiff = Math.abs(compCanvas.width - newWidth);
+      const heightDiff = Math.abs(compCanvas.height - newHeight);
+      if (widthDiff <= 2 && heightDiff <= 2) return;
+
+      applyResize(newWidth, newHeight);
+    };
+
+    // Observe container with a generous 300ms debounce
+    const observer = new ResizeObserver(() => {
       clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(() => resizeCanvases(entries), 50);
+      resizeTimer = setTimeout(resizeCanvases, 300);
     });
-    
+
     observer.observe(container);
 
     return () => {
@@ -80,6 +81,23 @@ const ArtCanvas = forwardRef((props, ref) => {
     if (!actCanvas) return;
 
     const onPointerDown = (e) => {
+      const state = useArtStore.getState();
+
+      // ── Eyedropper: sample composite canvas pixel ──────────────────────
+      if (state.brushType === 'eyedropper') {
+        const x = Math.floor(e.offsetX);
+        const y = Math.floor(e.offsetY);
+        const ctx = compositeRef.current.getContext('2d');
+        const pixel = ctx.getImageData(x, y, 1, 1).data;
+        const hex = '#' + [pixel[0], pixel[1], pixel[2]]
+          .map(v => v.toString(16).padStart(2, '0')).join('');
+        state.setBrushColor(hex);
+        state.addToRecentColors(hex);
+        // Revert to previous brush tool
+        if (prevToolRef.current) state.setBrushType(prevToolRef.current);
+        return;
+      }
+
       // Capture the pointer so strokes don't break if moving fast outside canvas
       try {
         actCanvas.setPointerCapture(e.pointerId);
@@ -132,10 +150,13 @@ const ArtCanvas = forwardRef((props, ref) => {
       // Clear active canvas
       const ctx = activeRef.current.getContext('2d');
       ctx.clearRect(0, 0, activeRef.current.width, activeRef.current.height);
+
+      // CRITICAL: Persist the final artwork so ResizeObserver can always restore it
+      persistedArtworkRef.current = compositeRef.current.toDataURL();
       
       // Push history
       if (strokeSnapshot.current) {
-        state.pushStroke(compositeRef.current.toDataURL());
+        state.pushStroke(persistedArtworkRef.current);
       }
       
       lastPoint.current = null;
@@ -352,13 +373,14 @@ const ArtCanvas = forwardRef((props, ref) => {
     }
   }));
 
+  const brushType = useArtStore(s => s.brushType);
   const canvasStyle = {
     position: 'absolute',
     top: 0,
     left: 0,
     width: '100%',
     height: '100%',
-    touchAction: 'none' // CRITICAL for pen tablets and touch gestures
+    touchAction: 'none', // CRITICAL for pen tablets and touch gestures
   };
 
   return (
@@ -373,7 +395,14 @@ const ArtCanvas = forwardRef((props, ref) => {
       }}
     >
       <canvas ref={compositeRef} style={canvasStyle} />
-      <canvas ref={activeRef} style={{ ...canvasStyle, zIndex: 10 }} />
+      <canvas 
+        ref={activeRef} 
+        style={{ 
+          ...canvasStyle, 
+          zIndex: 10,
+          cursor: brushType === 'eyedropper' ? 'crosshair' : 'default'
+        }} 
+      />
     </div>
   );
 });

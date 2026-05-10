@@ -14,6 +14,7 @@ import ContextDrawer from '../components/Features/ContextLayer/ContextDrawer';
 import AssistPanel from '../features/assist/AssistPanel';
 import ArtCanvas from '../art/ArtCanvas';
 import ArtToolbar from '../art/ArtToolbar';
+import ColorPanel from '../art/ColorPanel';
 import { deserializeCanvas } from '../canvas/serialize';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { useCollaboration } from '../hooks/useCollaboration';
@@ -287,6 +288,7 @@ export default function CanvasPage() {
           <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
             <ArtToolbar />
             <ArtCanvas ref={artCanvasRef} />
+            <ColorPanel />
           </div>
         )}
 
