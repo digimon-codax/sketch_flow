@@ -19,6 +19,6 @@ export default function ProtectedRoute({ children }) {
 
 export function PublicRoute({ children }) {
   const token = localStorage.getItem('sf_token');
-  if (token) return <Navigate to="/" replace />;
+  if (token) return <Navigate to="/dashboard" replace />;
   return children;
 }

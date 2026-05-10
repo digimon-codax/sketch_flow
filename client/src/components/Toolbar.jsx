@@ -85,12 +85,12 @@ const ToolButton = ({ tool, active, onClick }) => (
       borderRadius: 8,
       border: 'none',
       cursor: 'pointer',
-      background: active ? '#e8e7ff' : 'transparent',
-      color: active ? '#5753d4' : '#3d3d3d',
+      background: active ? 'var(--bg-hover)' : 'transparent',
+      color: active ? 'var(--accent)' : 'var(--text-primary)',
       transition: 'background 0.1s, color 0.1s',
       position: 'relative',
     }}
-    onMouseEnter={e => { if (!active) e.currentTarget.style.background = '#f1f0ff'; }}
+    onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'var(--bg-elevated)'; }}
     onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
   >
     <tool.icon />
@@ -98,7 +98,7 @@ const ToolButton = ({ tool, active, onClick }) => (
 );
 
 const Divider = () => (
-  <div style={{ width: 1, height: 24, background: '#e3e2fe', margin: '0 4px', flexShrink: 0 }} />
+  <div style={{ width: 1, height: 24, background: 'var(--border)', margin: '0 4px', flexShrink: 0 }} />
 );
 
 export const Toolbar = ({ canvas, activeTool, setActiveTool }) => {
@@ -291,11 +291,11 @@ export const Toolbar = ({ canvas, activeTool, setActiveTool }) => {
     display: 'flex',
     alignItems: 'center',
     gap: 2,
-    background: '#fff',
-    border: '1px solid #e3e2fe',
+    background: 'var(--bg-surface)',
+    border: '1px solid var(--border)',
     borderRadius: 12,
     padding: '6px 8px',
-    boxShadow: '0 2px 12px rgba(87,83,212,0.10), 0 1px 3px rgba(0,0,0,0.06)',
+    boxShadow: '0 12px 24px rgba(0,0,0,0.4)',
     userSelect: 'none',
     flexWrap: 'nowrap',
   };
@@ -325,14 +325,14 @@ export const Toolbar = ({ canvas, activeTool, setActiveTool }) => {
         title="AI-powered layout cleanup (SketchFlow exclusive)"
         style={{
           display: 'flex', alignItems: 'center', gap: 6,
-          padding: '6px 12px', borderRadius: 8, border: '1px solid #e3e2fe',
-          background: isCleaning ? '#f1f0ff' : '#f8f7ff',
-          color: '#5753d4', fontWeight: 600, fontSize: 13,
+          padding: '6px 12px', borderRadius: 8, border: '1px solid var(--border)',
+          background: isCleaning ? 'var(--bg-hover)' : 'var(--bg-elevated)',
+          color: 'var(--text-primary)', fontWeight: 600, fontSize: 13,
           cursor: isCleaning ? 'wait' : 'pointer',
           whiteSpace: 'nowrap', transition: 'background 0.15s',
         }}
-        onMouseEnter={e => { if (!isCleaning) e.currentTarget.style.background = '#e8e7ff'; }}
-        onMouseLeave={e => { if (!isCleaning) e.currentTarget.style.background = '#f8f7ff'; }}
+        onMouseEnter={e => { if (!isCleaning) e.currentTarget.style.background = 'var(--bg-hover)'; }}
+        onMouseLeave={e => { if (!isCleaning) e.currentTarget.style.background = 'var(--bg-elevated)'; }}
       >
         <span style={{ fontSize: 15 }} className={isCleaning ? 'animate-spin inline-block' : ''}>✨</span>
         {isCleaning ? 'Cleaning…' : 'Clean Up'}
@@ -345,14 +345,14 @@ export const Toolbar = ({ canvas, activeTool, setActiveTool }) => {
         style={{
           display: 'flex', alignItems: 'center', gap: 6,
           padding: '6px 12px', borderRadius: 8, border: 'none',
-          background: isAnalyzing ? '#4340b0' : '#5753d4',
-          color: '#fff', fontWeight: 700, fontSize: 13,
+          background: isAnalyzing ? 'var(--accent-hover)' : 'var(--accent)',
+          color: 'var(--accent-foreground)', fontWeight: 700, fontSize: 13,
           cursor: isAnalyzing ? 'wait' : 'pointer',
           whiteSpace: 'nowrap', transition: 'background 0.15s',
-          boxShadow: '0 2px 8px rgba(87,83,212,0.30)',
+          boxShadow: '0 4px 12px var(--accent-dim)',
         }}
-        onMouseEnter={e => { if (!isAnalyzing) e.currentTarget.style.background = '#4340b0'; }}
-        onMouseLeave={e => { if (!isAnalyzing) e.currentTarget.style.background = '#5753d4'; }}
+        onMouseEnter={e => { if (!isAnalyzing) e.currentTarget.style.background = 'var(--accent-hover)'; }}
+        onMouseLeave={e => { if (!isAnalyzing) e.currentTarget.style.background = 'var(--accent)'; }}
       >
         <span style={{ fontSize: 15 }} className={isAnalyzing ? 'animate-pulse inline-block' : ''}>🧠</span>
         {isAnalyzing ? 'Analyzing…' : 'Arch Assist'}

@@ -20,7 +20,7 @@ export default function RegisterPage() {
       const res = await api.post('/auth/register', { name, email, password });
       localStorage.setItem('sf_token', res.data.token);
       localStorage.setItem('sf_user', JSON.stringify(res.data.user));
-      navigate('/');
+      navigate('/dashboard');
     } catch (err) {
       setError(err.response?.data?.error || 'Registration failed. Please try again.');
     } finally {
@@ -31,42 +31,53 @@ export default function RegisterPage() {
   return (
     <div className="auth-container">
       <div className="auth-card">
-        <div className="auth-header">
+        <Link to="/" className="auth-logo-link">
           <div className="auth-logo">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M12 2L2 12L12 22L22 12L12 2Z" fill="var(--accent)" />
             </svg>
           </div>
-          <h1 className="auth-title">SketchFlow</h1>
-          <p className="auth-subtitle">Create your account to start sketching</p>
+        </Link>
+        <div className="auth-header">
+          <h1 className="heading-title auth-title">Create account</h1>
+          <p className="auth-subtitle">Get started with your architecture canvas</p>
         </div>
 
         <form className="auth-form" onSubmit={handleSubmit}>
-          <input
-            type="text"
-            placeholder="Full Name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-            autoComplete="name"
-          />
-          <input
-            type="email"
-            placeholder="Email address"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            autoComplete="email"
-          />
-          <input
-            type="password"
-            placeholder="Password (min 6 characters)"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            minLength={6}
-            autoComplete="new-password"
-          />
+          <div className="input-group">
+            <label>Full Name</label>
+            <input
+              type="text"
+              placeholder="John Doe"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              autoComplete="name"
+            />
+          </div>
+          <div className="input-group">
+            <label>Email address</label>
+            <input
+              type="email"
+              placeholder="name@company.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              autoComplete="email"
+            />
+          </div>
+          <div className="input-group">
+            <label>Password</label>
+            <input
+              type="password"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={6}
+              autoComplete="new-password"
+            />
+          </div>
           <button type="submit" className="auth-button" disabled={loading}>
             {loading ? 'Creating Account...' : 'Create Account'}
           </button>

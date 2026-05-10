@@ -247,7 +247,7 @@ export default function CanvasPage() {
         {isReadOnly && (
           <div style={{
             height: 32, background: 'var(--accent-dim)',
-            borderBottom: '1px solid rgba(212,168,83,0.25)',
+            borderBottom: '1px solid var(--border)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             gap: 8, flexShrink: 0,
           }}>

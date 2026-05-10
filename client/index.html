@@ -7,7 +7,70 @@
     <title>client</title>
   </head>
   <body>
-    <div id="root"></div>
+    <style>
+      body {
+        margin: 0;
+        background-color: #000000;
+      }
+      .initial-loader-wrapper {
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background-color: #000000;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 99999;
+        font-family: 'Inter', system-ui, sans-serif;
+      }
+      .orbit-spinner {
+        position: relative;
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        border: 2px solid rgba(255, 90, 0, 0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .orbit-spinner::before {
+        content: '';
+        position: absolute;
+        top: -2px; left: -2px;
+        width: 100%; height: 100%;
+        border-radius: 50%;
+        border: 2px solid transparent;
+        border-top-color: #FF5A00;
+        animation: spin 1s linear infinite;
+      }
+      .orbit-core {
+        width: 8px;
+        height: 8px;
+        background-color: #FF5A00;
+        border-radius: 50%;
+        box-shadow: 0 0 10px #FF5A00;
+        animation: pulse 1.5s ease-in-out infinite;
+      }
+      .loader-text {
+        margin-top: 32px;
+        color: #FF5A00;
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        animation: pulse 1.5s ease-in-out infinite;
+      }
+      @keyframes spin { 100% { transform: rotate(360deg); } }
+      @keyframes pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+    </style>
+    <div id="root">
+      <div class="initial-loader-wrapper">
+        <div class="orbit-spinner">
+          <div class="orbit-core"></div>
+        </div>
+        <div class="loader-text">Igniting Engines...</div>
+      </div>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

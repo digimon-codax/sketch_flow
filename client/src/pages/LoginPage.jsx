@@ -19,7 +19,7 @@ export default function LoginPage() {
       const res = await api.post('/auth/login', { email, password });
       localStorage.setItem('sf_token', res.data.token);
       localStorage.setItem('sf_user', JSON.stringify(res.data.user));
-      navigate('/');
+      navigate('/dashboard');
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to login. Please try again.');
     } finally {
@@ -30,33 +30,41 @@ export default function LoginPage() {
   return (
     <div className="auth-container">
       <div className="auth-card">
-        <div className="auth-header">
+        <Link to="/" className="auth-logo-link">
           <div className="auth-logo">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M12 2L2 12L12 22L22 12L12 2Z" fill="var(--accent)" />
             </svg>
           </div>
-          <h1 className="auth-title">SketchFlow</h1>
-          <p className="auth-subtitle">Welcome back to your architecture canvas</p>
+        </Link>
+        <div className="auth-header">
+          <h1 className="heading-title auth-title">Welcome back</h1>
+          <p className="auth-subtitle">Sign in to your architecture canvas</p>
         </div>
 
         <form className="auth-form" onSubmit={handleSubmit}>
-          <input
-            type="email"
-            placeholder="Email address"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            autoComplete="email"
-          />
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            autoComplete="current-password"
-          />
+          <div className="input-group">
+            <label>Email address</label>
+            <input
+              type="email"
+              placeholder="name@company.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              autoComplete="email"
+            />
+          </div>
+          <div className="input-group">
+            <label>Password</label>
+            <input
+              type="password"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              autoComplete="current-password"
+            />
+          </div>
           <button type="submit" className="auth-button" disabled={loading}>
             {loading ? 'Signing in...' : 'Sign In'}
           </button>

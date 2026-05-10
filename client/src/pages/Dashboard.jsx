@@ -37,8 +37,8 @@ function DiagramThumbnail({ elements }) {
     const offsetX = (140 - contentW * scale) / 2 - minX * scale;
     const offsetY = (90 - contentH * scale) / 2 - minY * scale;
 
-    ctx.strokeStyle = 'rgba(240, 237, 232, 0.25)';
-    ctx.fillStyle   = 'rgba(240, 237, 232, 0.07)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+    ctx.fillStyle   = 'rgba(255, 255, 255, 0.05)';
     ctx.lineWidth   = 0.8;
 
     elements.forEach(el => {
@@ -365,12 +365,12 @@ export default function Dashboard() {
                     transition: 'border-color 0.15s, box-shadow 0.15s',
                   }}
                   onMouseEnter={e => {
-                    e.currentTarget.style.borderColor = 'rgba(212,168,83,0.4)';
-                    e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.2)';
+                    e.currentTarget.style.borderColor = 'var(--border-focus)';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
                   }}
                   onMouseLeave={e => {
                     e.currentTarget.style.borderColor = 'var(--border)';
-                    e.currentTarget.style.boxShadow = 'none';
+                    e.currentTarget.style.transform = 'translateY(0)';
                   }}
                 >
                   {/* Shared badge */}
