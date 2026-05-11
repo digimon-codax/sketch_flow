@@ -19,14 +19,16 @@ const ArtCanvas = forwardRef((props, ref) => {
     const container = containerRef.current;
     const compCanvas = compositeRef.current;
     const actCanvas = activeRef.current;
-    
+
     if (!container || !compCanvas || !actCanvas) return;
 
     let resizeTimer;
 
     const applyResize = (newWidth, newHeight) => {
-      // Use persistedArtworkRef as the source of truth — NOT canvas.toDataURL()
-      // This ensures we restore correctly even if the canvas was already wiped.
+      if (newWidth <= 0 || newHeight <= 0) return;
+
+      // Always restore from persistedArtworkRef — the ResizeObserver approach
+      // was reading canvas.toDataURL() which raced with the canvas being cleared.
       const dataURL = persistedArtworkRef.current;
 
       compCanvas.width = newWidth;
@@ -45,35 +47,39 @@ const ArtCanvas = forwardRef((props, ref) => {
       }
     };
 
-    const resizeCanvases = () => {
+    // Size canvases once after layout has settled (rAF ensures flex is resolved)
+    requestAnimationFrame(() => {
       const rect = container.getBoundingClientRect();
-      const newWidth = Math.floor(rect.width);
-      const newHeight = Math.floor(rect.height);
-
-      if (newWidth <= 0 || newHeight <= 0) return;
-
-      // Only resize if dimensions changed by more than 2px — prevents sub-pixel
-      // float noise from react-colorful or flex reflows triggering unnecessary wipes.
-      const widthDiff = Math.abs(compCanvas.width - newWidth);
-      const heightDiff = Math.abs(compCanvas.height - newHeight);
-      if (widthDiff <= 2 && heightDiff <= 2) return;
-
-      applyResize(newWidth, newHeight);
-    };
-
-    // Observe container with a generous 300ms debounce
-    const observer = new ResizeObserver(() => {
-      clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(resizeCanvases, 300);
+      applyResize(Math.floor(rect.width), Math.floor(rect.height));
     });
 
-    observer.observe(container);
+    // ONLY respond to actual window resize events — NOT ResizeObserver.
+    // ResizeObserver fires on every react-colorful / flex micro-reflow, which
+    // constantly wipes the canvas mid-drawing session.
+    const handleWindowResize = () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        const rect = container.getBoundingClientRect();
+        const newWidth = Math.floor(rect.width);
+        const newHeight = Math.floor(rect.height);
+        // Only resize if the dimension actually changed meaningfully
+        if (
+          Math.abs(compCanvas.width - newWidth) > 5 ||
+          Math.abs(compCanvas.height - newHeight) > 5
+        ) {
+          applyResize(newWidth, newHeight);
+        }
+      }, 200);
+    };
 
+    window.addEventListener('resize', handleWindowResize);
     return () => {
-      observer.disconnect();
+      window.removeEventListener('resize', handleWindowResize);
       clearTimeout(resizeTimer);
     };
   }, []);
+
+
 
   // ─── POINTER EVENTS ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -144,7 +150,17 @@ const ArtCanvas = forwardRef((props, ref) => {
       // Erase and smudge draw directly to composite, so we only merge other brushes
       if (state.brushType !== 'eraser' && state.brushType !== 'smudge') {
         const compositeCtx = compositeRef.current.getContext('2d');
+        // ALWAYS reset to source-over before merging — eraser leaves destination-out
+        // on the composite context, which causes subsequent drawImage calls to erase
+        // the stroke instead of painting it.
+        compositeCtx.globalCompositeOperation = 'source-over';
+        compositeCtx.globalAlpha = 1;
         compositeCtx.drawImage(activeRef.current, 0, 0);
+      } else {
+        // After eraser/smudge, reset composite context state so next stroke merges correctly
+        const compositeCtx = compositeRef.current.getContext('2d');
+        compositeCtx.globalCompositeOperation = 'source-over';
+        compositeCtx.globalAlpha = 1;
       }
       
       // Clear active canvas
@@ -290,6 +306,9 @@ const ArtCanvas = forwardRef((props, ref) => {
         ctx.lineWidth = dynamicSize * 2;
         ctx.shadowBlur = 0;
         drawSmoothedLine(ctx, fromX, fromY, toX, toY);
+        // CRITICAL: reset composite context back to normal mode after erasing
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1;
         break;
         
       case 'smudge':
