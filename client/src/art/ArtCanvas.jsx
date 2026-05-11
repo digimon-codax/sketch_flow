@@ -270,7 +270,7 @@ const ArtCanvas = forwardRef(({ artData }, ref) => {
       const activeLayer = state.layers.find(l => l.id === state.activeLayerId);
       if (activeLayer?.locked) return;
 
-      try { actCanvas.setPointerCapture(e.pointerId); } catch (_) {}
+        try { interactionLayer.setPointerCapture(e.pointerId); } catch (_) {}
 
       const pressure = e.pointerType === 'mouse' ? 0.5 : (e.pressure || 0.5);
       const { x, y } = getZoomedCoords(e);
@@ -318,6 +318,8 @@ const ArtCanvas = forwardRef(({ artData }, ref) => {
     };
 
     const onPointerUp = (e) => {
+      try { interactionLayer.releasePointerCapture(e.pointerId); } catch (_) {}
+      
       if (e.pointerType === activePointerType.current) {
         activePointerType.current = null;
       }
