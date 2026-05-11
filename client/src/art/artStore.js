@@ -2,7 +2,7 @@ import { create } from 'zustand';
 
 export const useArtStore = create((set) => ({
   // ── Layers ───────────────────────────────────────────────────────────────
-  layers: [{ id: 'layer-1', name: 'Layer 1', visible: true, opacity: 1, data: null }],
+  layers: [{ id: 'layer-1', name: 'Layer 1', visible: true, opacity: 1, blendMode: 'source-over', locked: false }],
   activeLayerId: 'layer-1',
   
   setActiveLayer: (id) => set({ activeLayerId: id }),
@@ -13,6 +13,15 @@ export const useArtStore = create((set) => ({
   })),
   setLayerOpacity: (id, opacity) => set((state) => ({
     layers: state.layers.map(l => l.id === id ? { ...l, opacity } : l)
+  })),
+  setLayerBlendMode: (id, blendMode) => set((state) => ({
+    layers: state.layers.map(l => l.id === id ? { ...l, blendMode } : l)
+  })),
+  setLayerLocked: (id, locked) => set((state) => ({
+    layers: state.layers.map(l => l.id === id ? { ...l, locked } : l)
+  })),
+  renameLayer: (id, name) => set((state) => ({
+    layers: state.layers.map(l => l.id === id ? { ...l, name } : l)
   })),
   reorderLayers: (newLayers) => set({ layers: newLayers }),
 
