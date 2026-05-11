@@ -140,14 +140,20 @@ export default function ArtToolbar({ artCanvasRef }) {
           value={brushSize}
           onChange={(e) => setBrushSize(parseInt(e.target.value))}
         />
-        <div 
-          className="size-preview" 
-          style={{ 
-            width: Math.min(36, brushSize) + 'px', 
-            height: Math.min(36, brushSize) + 'px',
-            background: brushColor 
-          }} 
-        />
+        <div style={{ marginTop: '8px', position: 'relative', width: '40px', height: '40px', borderRadius: '4px', background: '#e5e5e5', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+          <div 
+            className="size-preview" 
+            style={{ 
+              width: Math.min(40, brushSize) + 'px', 
+              height: Math.min(40, brushSize) + 'px',
+              backgroundColor: brushType === 'eraser' ? '#ffffff' : brushColor,
+              borderRadius: '50%',
+              boxShadow: brushType === 'eraser' ? 'inset 0 0 0 1px #ccc' : 'none',
+              opacity: brushType === 'watercolor' ? 0.6 : (brushType === 'charcoal' ? 0.8 : 1),
+              filter: brushType === 'charcoal' ? 'url(#noise-filter)' : 'none'
+            }} 
+          />
+        </div>
       </div>
 
       <div className="tool-separator" />

@@ -6,6 +6,7 @@ const ArtCanvas = forwardRef(({ artData }, ref) => {
   const compositeRef = useRef(null);
   const activeRef = useRef(null);
   const guideRef = useRef(null);
+  const interactionRef = useRef(null);
   const layerCanvases = useRef(new Map()); // layerId → HTMLCanvasElement
 
   // Drawing state refs (never trigger re-renders)
@@ -15,6 +16,11 @@ const ArtCanvas = forwardRef(({ artData }, ref) => {
   const strokeSnapshot = useRef(null);
   const prevToolRef = useRef('pencil');
   const persistedArtworkRef = useRef(null);
+  
+  // Multitouch + Palm Rejection + Zoom/Pan
+  const activePointerType = useRef(null);
+  const activePointers = useRef(new Map());
+  const lastPinchDist = useRef(null);
 
   // ─── LAYER CANVAS MANAGEMENT ───────────────────────────────────────────
   const createLayerCanvas = useCallback((layerId, width, height) => {
@@ -215,20 +221,46 @@ const ArtCanvas = forwardRef(({ artData }, ref) => {
   // ─── POINTER EVENTS ────────────────────────────────────────────────────
   useEffect(() => {
     const actCanvas = activeRef.current;
-    if (!actCanvas) return;
+    const interactionLayer = interactionRef.current;
+    if (!actCanvas || !interactionLayer) return;
 
     const getActiveLayerCtx = () => {
       const { activeLayerId } = useArtStore.getState();
       const lc = layerCanvases.current.get(activeLayerId);
       return lc ? lc.getContext('2d') : null;
     };
+    
+    const getZoomedCoords = (e) => {
+      const { artZoom, artPanX, artPanY } = useArtStore.getState();
+      const rect = interactionLayer.getBoundingClientRect(); // use interaction layer since we moved events there
+      return {
+        x: (e.clientX - rect.left - artPanX) / artZoom,
+        y: (e.clientY - rect.top - artPanY) / artZoom
+      };
+    };
 
     const onPointerDown = (e) => {
+      // 1) Palm Rejection / Prefer Pen
+      if (isDrawing.current && e.pointerType === 'touch') {
+        e.preventDefault();
+        return;
+      }
+      if (activePointerType.current === 'pen' && e.pointerType === 'touch') {
+        return;
+      }
+      activePointerType.current = e.pointerType;
+
+      // 2) Multitouch Tracking
+      activePointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+      // If multitouch, don't start drawing
+      if (activePointers.current.size >= 2) return;
+
       const state = useArtStore.getState();
 
       if (state.brushType === 'eyedropper') {
-        const x = Math.floor(e.offsetX), y = Math.floor(e.offsetY);
-        const px = compositeRef.current.getContext('2d').getImageData(x, y, 1, 1).data;
+        const { x, y } = getZoomedCoords(e);
+        const px = compositeRef.current.getContext('2d').getImageData(Math.floor(x), Math.floor(y), 1, 1).data;
         const hex = '#' + [px[0], px[1], px[2]].map(v => v.toString(16).padStart(2, '0')).join('');
         state.setBrushColor(hex); state.addToRecentColors(hex);
         if (prevToolRef.current) state.setBrushType(prevToolRef.current);
@@ -241,7 +273,7 @@ const ArtCanvas = forwardRef(({ artData }, ref) => {
       try { actCanvas.setPointerCapture(e.pointerId); } catch (_) {}
 
       const pressure = e.pointerType === 'mouse' ? 0.5 : (e.pressure || 0.5);
-      const x = e.offsetX, y = e.offsetY;
+      const { x, y } = getZoomedCoords(e);
 
       isDrawing.current = true;
       currentPath.current = [{ x, y, pressure }];
@@ -255,16 +287,44 @@ const ArtCanvas = forwardRef(({ artData }, ref) => {
     };
 
     const onPointerMove = (e) => {
+      activePointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+      // Multitouch Pinch Zoom
+      if (activePointers.current.size === 2) {
+        const [p1, p2] = [...activePointers.current.values()];
+        const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+        if (lastPinchDist.current) {
+          const scale = dist / lastPinchDist.current;
+          useArtStore.getState().setArtZoom(Math.min(Math.max(useArtStore.getState().artZoom * scale, 0.1), 10));
+        }
+        lastPinchDist.current = dist;
+        return;
+      }
+
       if (!isDrawing.current) return;
-      const pressure = e.pointerType === 'mouse' ? 0.5 : (e.pressure || 0.5);
-      const x = e.offsetX, y = e.offsetY;
-      const last = lastPoint.current;
-      currentPath.current.push({ x, y, pressure });
-      drawWithSymmetry(last.x, last.y, x, y, pressure);
-      lastPoint.current = { x, y, pressure };
+      
+      const state = useArtStore.getState();
+      const events = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+      
+      events.forEach(coalescedEvent => {
+        const pressure = coalescedEvent.pointerType === 'mouse' ? 0.5 : (coalescedEvent.pressure || 0.5);
+        const { x, y } = getZoomedCoords(coalescedEvent);
+        const last = lastPoint.current;
+        
+        currentPath.current.push({ x, y, pressure });
+        drawWithSymmetry(last.x, last.y, x, y, pressure);
+        lastPoint.current = { x, y, pressure };
+      });
     };
 
-    const onPointerUp = () => {
+    const onPointerUp = (e) => {
+      if (e.pointerType === activePointerType.current) {
+        activePointerType.current = null;
+      }
+
+      activePointers.current.delete(e.pointerId);
+      if (activePointers.current.size === 0) lastPinchDist.current = null;
+
       if (!isDrawing.current) return;
       isDrawing.current = false;
 
@@ -297,16 +357,16 @@ const ArtCanvas = forwardRef(({ artData }, ref) => {
       currentPath.current = [];
     };
 
-    actCanvas.addEventListener('pointerdown', onPointerDown);
-    actCanvas.addEventListener('pointermove', onPointerMove);
-    actCanvas.addEventListener('pointerup', onPointerUp);
-    actCanvas.addEventListener('pointercancel', onPointerUp);
+    interactionLayer.addEventListener('pointerdown', onPointerDown);
+    interactionLayer.addEventListener('pointermove', onPointerMove);
+    interactionLayer.addEventListener('pointerup', onPointerUp);
+    interactionLayer.addEventListener('pointercancel', onPointerUp);
 
     return () => {
-      actCanvas.removeEventListener('pointerdown', onPointerDown);
-      actCanvas.removeEventListener('pointermove', onPointerMove);
-      actCanvas.removeEventListener('pointerup', onPointerUp);
-      actCanvas.removeEventListener('pointercancel', onPointerUp);
+      interactionLayer.removeEventListener('pointerdown', onPointerDown);
+      interactionLayer.removeEventListener('pointermove', onPointerMove);
+      interactionLayer.removeEventListener('pointerup', onPointerUp);
+      interactionLayer.removeEventListener('pointercancel', onPointerUp);
     };
   }, [recompositeAllLayers]);
 
@@ -515,8 +575,50 @@ const ArtCanvas = forwardRef(({ artData }, ref) => {
   }));
 
   const brushType = useArtStore(s => s.brushType);
+  const brushSize = useArtStore(s => s.brushSize);
+  const brushColor = useArtStore(s => s.brushColor);
   const symmetryMode = useArtStore(s => s.symmetryMode);
   const symmetryLines = useArtStore(s => s.symmetryLines);
+  const artZoom = useArtStore(s => s.artZoom);
+  const artPanX = useArtStore(s => s.artPanX);
+  const artPanY = useArtStore(s => s.artPanY);
+
+  const [cursorStyle, setCursorStyle] = React.useState('crosshair');
+
+  useEffect(() => {
+    if (brushType === 'eyedropper') {
+      setCursorStyle('crosshair');
+      return;
+    }
+    if (brushType === 'smudge') {
+      setCursorStyle('cell');
+      return;
+    }
+    
+    // Generate inline SVG cursor
+    const size = Math.min(brushSize, 64);
+    const r = Math.max(1, size / 2 - 1);
+    const rOuter = size / 2;
+    
+    let svg = '';
+    if (brushType === 'eraser') {
+      svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}">
+        <circle cx="${rOuter}" cy="${rOuter}" r="${r}" fill="#ffffff" stroke="#000000" stroke-width="1.5" opacity="0.8"/>
+      </svg>`;
+    } else if (brushType === 'watercolor') {
+      svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}">
+        <circle cx="${rOuter}" cy="${rOuter}" r="${r}" fill="none" stroke="${brushColor}" stroke-width="1.5" opacity="0.4"/>
+      </svg>`;
+    } else {
+      svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}">
+        <circle cx="${rOuter}" cy="${rOuter}" r="${r}" fill="none" stroke="${brushColor}" stroke-width="1.5" opacity="0.8"/>
+        <circle cx="${rOuter}" cy="${rOuter}" r="1" fill="${brushColor}"/>
+      </svg>`;
+    }
+    
+    const url = 'data:image/svg+xml;base64,' + btoa(svg);
+    setCursorStyle(`url("${url}") ${rOuter} ${rOuter}, crosshair`);
+  }, [brushType, brushSize, brushColor]);
 
   const drawSymmetryGuides = useCallback(() => {
     const canvas = guideRef.current;
@@ -568,10 +670,24 @@ const ArtCanvas = forwardRef(({ artData }, ref) => {
   }, [drawSymmetryGuides]);
 
   return (
-    <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative', background: '#ffffff', overflow: 'hidden' }}>
-      <canvas ref={compositeRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', touchAction: 'none' }} />
-      <canvas ref={activeRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', touchAction: 'none', zIndex: 10, cursor: brushType === 'eyedropper' ? 'crosshair' : 'default' }} />
-      <canvas ref={guideRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 15 }} />
+    <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative', background: '#e5e5e5', overflow: 'hidden' }}>
+      <div style={{
+        position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+        transform: `translate(${artPanX}px, ${artPanY}px) scale(${artZoom})`,
+        transformOrigin: 'top left',
+        transition: 'none', background: '#ffffff',
+        pointerEvents: 'none' // the interaction surface covers the screen
+      }}>
+        <canvas ref={compositeRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }} />
+        <canvas ref={activeRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 10 }} />
+        <canvas ref={guideRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 15 }} />
+      </div>
+      
+      {/* Interaction Surface */}
+      <div 
+        ref={interactionRef}
+        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', touchAction: 'none', zIndex: 20, cursor: cursorStyle }}
+      />
       
       {symmetryMode !== 'none' && (
         <div 

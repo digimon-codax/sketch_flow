@@ -1,6 +1,13 @@
 import { create } from 'zustand';
 
 export const useArtStore = create((set) => ({
+  // ── Canvas View ──────────────────────────────────────────────────────────
+  artZoom: 1,
+  artPanX: 0,
+  artPanY: 0,
+  setArtZoom: (zoom) => set({ artZoom: zoom }),
+  setArtPan: (x, y) => set({ artPanX: x, artPanY: y }),
+
   // ── Layers ───────────────────────────────────────────────────────────────
   layers: [{ id: 'layer-1', name: 'Layer 1', visible: true, opacity: 1, blendMode: 'source-over', locked: false }],
   activeLayerId: 'layer-1',
