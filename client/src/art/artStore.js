@@ -80,11 +80,26 @@ export const useArtStore = create((set) => ({
     if (newHistory.length > 50) newHistory.shift();
     return { strokeHistory: newHistory, historyPointer: newHistory.length - 1 };
   }),
-  undoStroke: () => set((state) => ({
-    historyPointer: Math.max(-1, state.historyPointer - 1)
-  })),
-  redoStroke: () => set((state) => ({
-    historyPointer: Math.min(state.strokeHistory.length - 1, state.historyPointer + 1)
-  })),
+  setStrokeHistory: (history) => set({ strokeHistory: history, historyPointer: history.length - 1 }),
+  undoStroke: () => {
+    let snapshot = null;
+    set((state) => {
+      if (state.historyPointer <= 0) return state; // Can't undo past the first initial snapshot
+      const newPointer = state.historyPointer - 1;
+      snapshot = state.strokeHistory[newPointer];
+      return { historyPointer: newPointer };
+    });
+    return snapshot;
+  },
+  redoStroke: () => {
+    let snapshot = null;
+    set((state) => {
+      if (state.historyPointer >= state.strokeHistory.length - 1) return state;
+      const newPointer = state.historyPointer + 1;
+      snapshot = state.strokeHistory[newPointer];
+      return { historyPointer: newPointer };
+    });
+    return snapshot;
+  },
 }));
 

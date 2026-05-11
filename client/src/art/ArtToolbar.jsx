@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
-import { Pencil, PenTool, Droplets, Wind, Eraser, Blend, Pipette, CircleSlash, FlipHorizontal, FlipVertical, PlusSquare, Asterisk, HelpCircle } from 'lucide-react';
+import { Pencil, PenTool, Droplets, Wind, Eraser, Blend, Pipette, CircleSlash, FlipHorizontal, FlipVertical, PlusSquare, Asterisk, HelpCircle, Trash2 } from 'lucide-react';
 import { useArtStore } from './artStore';
+import { useUIStore } from '../store/uiStore';
 import './ArtToolbar.css';
 
 const BRUSHES = [
@@ -21,7 +22,7 @@ const SYMMETRY_MODES = [
   { id: 'radial', icon: Asterisk, label: 'Radial' },
 ];
 
-export default function ArtToolbar() {
+export default function ArtToolbar({ artCanvasRef }) {
   const { 
     brushType, setBrushType, 
     brushSize, setBrushSize,
@@ -48,8 +49,20 @@ export default function ArtToolbar() {
       
       if (e.ctrlKey || e.metaKey) {
         if (key === 'z') {
-          if (e.shiftKey) redoStroke();
-          else undoStroke();
+          const state = useArtStore.getState();
+          if (e.shiftKey) {
+            if (state.historyPointer < state.strokeHistory.length - 1) {
+              const nextPointer = state.historyPointer + 1;
+              artCanvasRef?.current?.applySnapshot(state.strokeHistory[nextPointer]);
+              state.redoStroke();
+            }
+          } else {
+            if (state.historyPointer > 0) {
+              const prevPointer = state.historyPointer - 1;
+              artCanvasRef?.current?.applySnapshot(state.strokeHistory[prevPointer]);
+              state.undoStroke();
+            }
+          }
           e.preventDefault();
         }
         return;
@@ -176,8 +189,27 @@ export default function ArtToolbar() {
 
       {/* ─── AT BOTTOM ─── */}
       <div className="zoom-display">100%</div>
-      <button className="tool-btn" style={{ marginBottom: '8px' }}>
+      <button 
+        className="tool-btn" 
+        style={{ marginBottom: '8px' }}
+        title="Help"
+      >
         <HelpCircle size={16} />
+      </button>
+
+      <button 
+        className="tool-btn danger-btn" 
+        style={{ marginBottom: '8px', color: '#ef4444' }}
+        title="Clear Canvas"
+        onClick={() => {
+          if (window.confirm("Clear all layers? This cannot be undone.")) {
+            artCanvasRef?.current?.clearCanvas();
+            artCanvasRef?.current?.takeSnapshot();
+            useUIStore.getState().showToast("Canvas cleared");
+          }
+        }}
+      >
+        <Trash2 size={16} />
       </button>
     </div>
   );

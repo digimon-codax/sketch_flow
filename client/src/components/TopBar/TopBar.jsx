@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { Sparkles, BrainCircuit, Share2, X, Link, Check } from 'lucide-react';
+import { Sparkles, BrainCircuit, Share2, X, Link, Check, CloudUpload, Download, ChevronDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../api';
 import { CanvasContext } from '../../canvas/SketchCanvas';
 import { useCleanup } from '../../features/cleanup/useCleanup';
 import { useArchAssist } from '../../features/assist/useArchAssist';
 import { useCanvasStore } from '../../store/canvasStore';
+import { useUIStore } from '../../store/uiStore';
+import { useArtStore } from '../../art/artStore';
 import ModeSwitcher from '../ModeSwitcher/ModeSwitcher';
 import './TopBar.css';
 
@@ -277,7 +279,7 @@ function ShareModal({ diagramId, onClose }) {
 }
 
 /* ─── TopBar ─────────────────────────────────────────────────────────────── */
-export default function TopBar({ diagramId, diagramName, saveState }) {
+export default function TopBar({ diagramId, diagramName, saveState, artCanvasRef }) {
   const [isEditing,  setIsEditing]  = useState(false);
   const [name,       setName]       = useState(diagramName || 'Untitled Diagram');
   const [zoom,       setZoom]       = useState(100);
@@ -289,6 +291,8 @@ export default function TopBar({ diagramId, diagramName, saveState }) {
   const userRole = useCanvasStore(s => s.userRole);
   const canvasMode = useCanvasStore(s => s.canvasMode);
   const navigate = useNavigate();
+  const [artSaving, setArtSaving] = useState(false);
+  const [artSaved,  setArtSaved]  = useState(false);
 
   useEffect(() => { if (diagramName) setName(diagramName); }, [diagramName]);
 
@@ -327,6 +331,57 @@ export default function TopBar({ diagramId, diagramName, saveState }) {
     localStorage.removeItem('user');
     localStorage.removeItem('sf_user');
     navigate('/login');
+  };
+
+  const handleSaveArt = async () => {
+    if (!artCanvasRef?.current || !diagramId) return;
+    setArtSaving(true);
+    try {
+      const { layers: layerList } = useArtStore.getState();
+
+      // Build per-layer full-res dataURLs directly from live canvases
+      const layersData = {};
+      layerList.forEach(layer => {
+        const lc = artCanvasRef.current.layerCanvases?.get(layer.id);
+        if (lc && lc.width > 0) {
+          layersData[layer.id] = lc.toDataURL('image/png');
+        }
+      });
+
+      // Composite PNG for quick preview
+      const dataURL = artCanvasRef.current.getCompositeDataURL();
+
+      await api.patch(`/diagrams/${diagramId}`, {
+        // Persist mode so page reopens in art mode on refresh
+        appState: { canvasMode: 'art' },
+        artData: {
+          dataURL,
+          layers: layersData,
+          layerMeta: layerList,
+          updatedAt: Date.now(),
+        }
+      });
+      setArtSaved(true);
+      useUIStore.getState().showToast('Artwork saved');
+      setTimeout(() => setArtSaved(false), 2500);
+    } catch (err) {
+      console.error('Failed to save artwork', err);
+    } finally {
+      setArtSaving(false);
+    }
+  };
+
+
+  const handleExportArt = (format) => {
+    if (!artCanvasRef?.current) return;
+    const dataURL = artCanvasRef.current.getCompositeDataURL();
+    if (!dataURL) return;
+    const mimeType = format === 'jpeg' ? 'image/jpeg' : 'image/png';
+    // Re-encode with correct mime if needed
+    const link = document.createElement('a');
+    link.download = `${name || 'artwork'}.${format}`;
+    link.href = dataURL;
+    link.click();
   };
 
   const sfUser = (() => { try { return JSON.parse(localStorage.getItem('sf_user') ?? localStorage.getItem('user') ?? '{}'); } catch { return {}; } })();
@@ -421,6 +476,54 @@ export default function TopBar({ diagramId, diagramName, saveState }) {
           <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginRight: '8px', fontFamily: 'JetBrains Mono' }}>
             {zoom}%
           </div>
+
+          {/* Art mode: Save + Export buttons */}
+          {canvasMode === 'art' && (
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <button
+                className={`feature-btn ${artSaving ? 'loading' : ''}`}
+                onClick={handleSaveArt}
+                disabled={artSaving}
+                style={artSaved ? { color: '#22c55e', borderColor: '#22c55e' } : {}}
+              >
+                {artSaving ? spinnerEl : <CloudUpload size={14} />}
+                {artSaving ? 'Saving...' : artSaved ? '✓ Saved' : 'Save Art'}
+              </button>
+
+              <div style={{ position: 'relative' }} className="export-dropdown-wrap">
+                <button
+                  className="feature-btn"
+                  onClick={(e) => {
+                    const el = e.currentTarget.nextSibling;
+                    el.style.display = el.style.display === 'flex' ? 'none' : 'flex';
+                  }}
+                >
+                  <Download size={14} /> Export <ChevronDown size={12} />
+                </button>
+                <div style={{
+                  display: 'none', flexDirection: 'column',
+                  position: 'absolute', top: '36px', right: 0,
+                  background: 'var(--bg-surface)', border: '1px solid var(--border)',
+                  borderRadius: '8px', padding: '4px', minWidth: '170px',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.4)', zIndex: 500,
+                }}>
+                  {[['png','Export as PNG'], ['jpeg','Export as JPEG']].map(([fmt, label]) => (
+                    <button key={fmt}
+                      onClick={() => { handleExportArt(fmt); }}
+                      style={{
+                        background: 'none', border: 'none', textAlign: 'left',
+                        padding: '8px 12px', borderRadius: '6px', cursor: 'pointer',
+                        color: 'var(--text-primary)', fontSize: '13px',
+                        fontFamily: 'Inter', whiteSpace: 'nowrap',
+                      }}
+                      onMouseEnter={e => e.target.style.background = 'var(--bg-hover)'}
+                      onMouseLeave={e => e.target.style.background = 'none'}
+                    >{label}</button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
 
           <button className="feature-btn" onClick={() => setShareOpen(true)}>
             <Share2 size={14} /> Share

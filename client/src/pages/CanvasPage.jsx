@@ -15,6 +15,7 @@ import AssistPanel from '../features/assist/AssistPanel';
 import ArtCanvas from '../art/ArtCanvas';
 import ArtToolbar from '../art/ArtToolbar';
 import ArtRightPanel from '../art/ArtRightPanel';
+import { useArtStore } from '../art/artStore';
 import { deserializeCanvas } from '../canvas/serialize';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { useCollaboration } from '../hooks/useCollaboration';
@@ -64,6 +65,7 @@ export default function CanvasPage() {
   useCollaboration(fabricCanvasRef, id, ws);
 
   const canvasMode = useCanvasStore(s => s.canvasMode);
+  const toastMessage = useUIStore(s => s.toastMessage);
 
   useEffect(() => {
     let isMounted = true;
@@ -83,6 +85,45 @@ export default function CanvasPage() {
           const role = myMember?.role ?? 'viewer';
           setMyRole(role);
           useCanvasStore.getState().setUserRole(role);
+
+          if (res.data.appState?.canvasMode) {
+            useCanvasStore.getState().setCanvasMode(res.data.appState.canvasMode);
+          }
+
+          // Restore saved artwork if artData exists
+          if (res.data.artData?.layers) {
+            const { layerMeta } = res.data.artData;
+            // Restore layer metadata (names, opacity, blend, locked, visibility)
+            if (layerMeta?.length) {
+              useArtStore.getState().reorderLayers(layerMeta);
+              useArtStore.getState().setActiveLayer(layerMeta[0].id);
+            }
+            // Restore pixel data — must wait until artCanvasRef is mounted
+            const tryRestore = () => {
+              if (!artCanvasRef.current) {
+                setTimeout(tryRestore, 100);
+                return;
+              }
+              const savedLayers = res.data.artData.layers;
+              const promises = Object.entries(savedLayers).map(([layerId, dataURL]) =>
+                new Promise(resolve => {
+                  // Ensure the layer canvas exists
+                  let lc = artCanvasRef.current.layerCanvases.get(layerId);
+                  if (!lc) lc = artCanvasRef.current.createLayerCanvas(layerId);
+                  const ctx = lc.getContext('2d');
+                  const img = new Image();
+                  img.onload = () => { ctx.clearRect(0, 0, lc.width, lc.height); ctx.drawImage(img, 0, 0); resolve(); };
+                  img.src = dataURL;
+                })
+              );
+              Promise.all(promises).then(() => {
+                artCanvasRef.current.recompositeAllLayers();
+                // Seed the history with this restored state
+                artCanvasRef.current.takeSnapshot();
+              });
+            };
+            tryRestore();
+          }
         }
       } catch (err) {
         console.error('Failed to load diagram', err);
@@ -93,6 +134,16 @@ export default function CanvasPage() {
     fetchDiagram();
     return () => { isMounted = false; };
   }, [id]);
+
+  useEffect(() => {
+    if (diagram?.artData && canvasMode === 'art' && artCanvasRef.current) {
+      const artStore = useArtStore.getState();
+      if (artStore.strokeHistory.length === 0) {
+        artCanvasRef.current.applySnapshot({ layers: diagram.artData.layers });
+        artStore.pushStroke({ timestamp: Date.now(), layers: diagram.artData.layers });
+      }
+    }
+  }, [diagram, canvasMode]);
 
   useEffect(() => {
     let debounceSnap = null;
@@ -247,7 +298,17 @@ export default function CanvasPage() {
   return (
     <CanvasContext.Provider value={fabricCanvasRef}>
       <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--bg-base)', position: 'relative' }}>
-        <TopBar diagramId={diagram?._id} diagramName={diagram?.name} saveState={saveState} />
+        {toastMessage && (
+          <div style={{
+            position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)',
+            background: 'var(--bg-elevated)', color: 'var(--text-primary)',
+            padding: '10px 20px', borderRadius: '4px', zIndex: 9999, fontSize: '14px',
+            border: '1px solid var(--border)', boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
+          }}>
+            {toastMessage}
+          </div>
+        )}
+        <TopBar diagramId={diagram?._id} diagramName={diagram?.name} saveState={saveState} artCanvasRef={artCanvasRef} setSaveState={setSaveState} />
 
         {/* Viewer banner */}
         {isReadOnly && (
@@ -286,7 +347,7 @@ export default function CanvasPage() {
           </>
         ) : (
           <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-            <ArtToolbar />
+            <ArtToolbar artCanvasRef={artCanvasRef} />
             <ArtCanvas ref={artCanvasRef} />
             <ArtRightPanel artCanvasRef={artCanvasRef} />
           </div>

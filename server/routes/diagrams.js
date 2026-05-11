@@ -79,6 +79,7 @@ router.get("/:id", async (req, res) => {
       elements: diagram.elements,
       appState: diagram.appState,
       members: diagram.members,
+      artData: diagram.artData ?? null,
       createdAt: diagram.createdAt,
       updatedAt: diagram.updatedAt,
     });
@@ -103,11 +104,12 @@ router.patch("/:id", async (req, res) => {
       return res.status(403).json({ error: "Forbidden" });
     }
 
-    const { name, elements, appState } = req.body;
+    const { name, elements, appState, artData } = req.body;
     const updates = {};
     if (name !== undefined) updates.name = name.trim();
     if (elements !== undefined) updates.elements = elements;
     if (appState !== undefined) updates.appState = appState;
+    if (artData !== undefined) updates.artData = artData;
 
     const updated = await Diagram.findByIdAndUpdate(
       req.params.id,

@@ -34,6 +34,10 @@ const diagramSchema = new mongoose.Schema(
       type: [memberSchema],
       default: [],
     },
+    artData: {
+      type: Object,
+      default: null,
+    },
   },
   { timestamps: true }
 );

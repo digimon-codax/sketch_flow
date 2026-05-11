@@ -1,10 +1,11 @@
 import React, { useRef, useEffect, useImperativeHandle, forwardRef, useCallback } from 'react';
 import { useArtStore } from './artStore';
 
-const ArtCanvas = forwardRef((props, ref) => {
+const ArtCanvas = forwardRef(({ artData }, ref) => {
   const containerRef = useRef(null);
   const compositeRef = useRef(null);
   const activeRef = useRef(null);
+  const guideRef = useRef(null);
   const layerCanvases = useRef(new Map()); // layerId → HTMLCanvasElement
 
   // Drawing state refs (never trigger re-renders)
@@ -48,7 +49,35 @@ const ArtCanvas = forwardRef((props, ref) => {
     persistedArtworkRef.current = comp.toDataURL();
   }, []);
 
+  const takeSnapshot = useCallback(() => {
+    const snapshot = { timestamp: Date.now(), layers: {} };
+    layerCanvases.current.forEach((canvas, layerId) => {
+      snapshot.layers[layerId] = canvas.toDataURL();
+    });
+    useArtStore.getState().pushStroke(snapshot);
+  }, []);
+
+  const applySnapshot = useCallback((snapshot) => {
+    if (!snapshot) return;
+    const promises = Object.entries(snapshot.layers).map(([layerId, dataURL]) => {
+      return new Promise(resolve => {
+        const canvas = layerCanvases.current.get(layerId);
+        if (!canvas) { resolve(); return; }
+        const ctx = canvas.getContext('2d');
+        const img = new Image();
+        img.onload = () => {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0);
+          resolve();
+        };
+        img.src = dataURL;
+      });
+    });
+    Promise.all(promises).then(() => recompositeAllLayers());
+  }, [recompositeAllLayers]);
+
   // Expose recompositeAllLayers and layerCanvases so LayersPanel can call them
+
   // (stored on the ref object directly, not via useImperativeHandle array)
 
   // ─── INIT & RESIZE ─────────────────────────────────────────────────────
@@ -56,7 +85,8 @@ const ArtCanvas = forwardRef((props, ref) => {
     const container = containerRef.current;
     const compCanvas = compositeRef.current;
     const actCanvas = activeRef.current;
-    if (!container || !compCanvas || !actCanvas) return;
+    const guideCanvas = guideRef.current;
+    if (!container || !compCanvas || !actCanvas || !guideCanvas) return;
 
     let resizeTimer;
 
@@ -67,6 +97,8 @@ const ArtCanvas = forwardRef((props, ref) => {
       compCanvas.height = h;
       actCanvas.width = w;
       actCanvas.height = h;
+      guideCanvas.width = w;
+      guideCanvas.height = h;
 
       // Resize all layer canvases, preserving their content
       const restorePromises = [];
@@ -91,12 +123,55 @@ const ArtCanvas = forwardRef((props, ref) => {
       const rect = container.getBoundingClientRect();
       const w = Math.floor(rect.width);
       const h = Math.floor(rect.height);
-      // Create canvases for any existing layers
-      const { layers } = useArtStore.getState();
-      layers.forEach(layer => {
-        if (!layerCanvases.current.has(layer.id)) createLayerCanvas(layer.id, w, h);
-      });
-      applyResize(w, h);
+
+      const { layers, strokeHistory } = useArtStore.getState();
+
+      // If saved artData has layerMeta, apply it first so layer canvases are created correctly
+      if (artData?.layerMeta?.length) {
+        useArtStore.getState().reorderLayers(artData.layerMeta);
+        useArtStore.getState().setActiveLayer(artData.layerMeta[0].id);
+        artData.layerMeta.forEach(layer => {
+          if (!layerCanvases.current.has(layer.id)) createLayerCanvas(layer.id, w, h);
+        });
+      } else {
+        layers.forEach(layer => {
+          if (!layerCanvases.current.has(layer.id)) createLayerCanvas(layer.id, w, h);
+        });
+      }
+
+      // Resize all canvases to correct dimensions
+      compCanvas.width = w; compCanvas.height = h;
+      actCanvas.width  = w; actCanvas.height  = h;
+      guideCanvas.width  = w; guideCanvas.height  = h;
+      layerCanvases.current.forEach(lc => { lc.width = w; lc.height = h; });
+
+      if (artData?.layers && Object.keys(artData.layers).length > 0) {
+        // Restore saved layer pixel data AFTER canvases are properly sized
+        const promises = Object.entries(artData.layers).map(([layerId, dataURL]) =>
+          new Promise(resolve => {
+            const lc = layerCanvases.current.get(layerId);
+            if (!lc) { resolve(); return; }
+            const img = new Image();
+            img.onload = () => {
+              const ctx = lc.getContext('2d');
+              ctx.clearRect(0, 0, lc.width, lc.height);
+              ctx.drawImage(img, 0, 0);
+              resolve();
+            };
+            img.src = dataURL;
+          })
+        );
+        Promise.all(promises).then(() => {
+          recompositeAllLayers();
+          takeSnapshot(); // seed history with loaded state
+        });
+      } else {
+        // Fresh canvas — fill white and take initial snapshot
+        const ctx = compCanvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, w, h);
+        if (strokeHistory.length === 0) takeSnapshot();
+      }
     });
 
     const handleWindowResize = () => {
@@ -114,6 +189,28 @@ const ArtCanvas = forwardRef((props, ref) => {
     window.addEventListener('resize', handleWindowResize);
     return () => { window.removeEventListener('resize', handleWindowResize); clearTimeout(resizeTimer); };
   }, [createLayerCanvas, recompositeAllLayers]);
+
+  // ─── KEYBOARD SHORTCUTS ────────────────────────────────────────────────
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+      if ((e.ctrlKey || e.metaKey) && typeof useArtStore.getState().undoStroke === 'function') {
+        if (e.shiftKey && e.key.toLowerCase() === 'z') {
+          e.preventDefault();
+          const snapshot = useArtStore.getState().redoStroke();
+          if (snapshot) applySnapshot(snapshot);
+        } else if (e.key === 'z') {
+          e.preventDefault();
+          const snapshot = useArtStore.getState().undoStroke();
+          if (snapshot) applySnapshot(snapshot);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [applySnapshot]);
 
   // ─── POINTER EVENTS ────────────────────────────────────────────────────
   useEffect(() => {
@@ -194,10 +291,7 @@ const ArtCanvas = forwardRef((props, ref) => {
       }
 
       recompositeAllLayers();
-
-      if (strokeSnapshot.current) {
-        state.pushStroke(persistedArtworkRef.current);
-      }
+      takeSnapshot();
 
       lastPoint.current = null;
       currentPath.current = [];
@@ -217,27 +311,50 @@ const ArtCanvas = forwardRef((props, ref) => {
   }, [recompositeAllLayers]);
 
   // ─── SYMMETRY ──────────────────────────────────────────────────────────
+  function getMirroredPoints(x, y, canvasWidth, canvasHeight, symmetryMode, symmetryLines) {
+    const cx = canvasWidth / 2;
+    const cy = canvasHeight / 2;
+    const points = [];
+    
+    if (symmetryMode === 'vertical' || symmetryMode === 'both') {
+      points.push({ x: 2 * cx - x, y });
+    }
+    if (symmetryMode === 'horizontal' || symmetryMode === 'both') {
+      points.push({ x, y: 2 * cy - y });
+    }
+    if (symmetryMode === 'both') {
+      points.push({ x: 2 * cx - x, y: 2 * cy - y });
+    }
+    if (symmetryMode === 'radial') {
+      for (let i = 1; i < symmetryLines; i++) {
+        const angle = (Math.PI * 2 * i) / symmetryLines;
+        const dx = x - cx;
+        const dy = y - cy;
+        const rotX = dx * Math.cos(angle) - dy * Math.sin(angle);
+        const rotY = dx * Math.sin(angle) + dy * Math.cos(angle);
+        points.push({ x: cx + rotX, y: cy + rotY });
+      }
+    }
+    
+    return points;
+  }
+
   const drawWithSymmetry = (fromX, fromY, toX, toY, pressure) => {
     const state = useArtStore.getState();
     const { symmetryMode, symmetryLines } = state;
     const w = compositeRef.current.width;
     const h = compositeRef.current.height;
-    const cx = w / 2, cy = h / 2;
     const d = (fx, fy, tx, ty) => drawStroke(fx, fy, tx, ty, pressure, state);
 
+    // Draw primary stroke
     d(fromX, fromY, toX, toY);
-    if (symmetryMode === 'horizontal' || symmetryMode === 'both') d(w - fromX, fromY, w - toX, toY);
-    if (symmetryMode === 'vertical'   || symmetryMode === 'both') d(fromX, h - fromY, toX, h - toY);
-    if (symmetryMode === 'both') d(w - fromX, h - fromY, w - toX, h - toY);
-    if (symmetryMode === 'radial' && symmetryLines > 1) {
-      for (let i = 1; i < symmetryLines; i++) {
-        const a = (2 * Math.PI * i) / symmetryLines;
-        const cos = Math.cos(a), sin = Math.sin(a);
-        const rfx = cx + (fromX - cx) * cos - (fromY - cy) * sin;
-        const rfy = cy + (fromX - cx) * sin + (fromY - cy) * cos;
-        const rtx = cx + (toX - cx) * cos - (toY - cy) * sin;
-        const rty = cy + (toX - cx) * sin + (toY - cy) * cos;
-        d(rfx, rfy, rtx, rty);
+
+    if (symmetryMode !== 'none') {
+      const mirroredFrom = getMirroredPoints(fromX, fromY, w, h, symmetryMode, symmetryLines);
+      const mirroredTo = getMirroredPoints(toX, toY, w, h, symmetryMode, symmetryLines);
+      
+      for (let i = 0; i < mirroredFrom.length; i++) {
+        d(mirroredFrom[i].x, mirroredFrom[i].y, mirroredTo[i].x, mirroredTo[i].y);
       }
     }
   };
@@ -347,7 +464,10 @@ const ArtCanvas = forwardRef((props, ref) => {
   // ─── IMPERATIVE API ────────────────────────────────────────────────────
   useImperativeHandle(ref, () => ({
     recompositeAllLayers,
-    layerCanvases: layerCanvases.current,
+    // Return the live Map so callers always get the current canvases
+    get layerCanvases() { return layerCanvases.current; },
+    takeSnapshot,
+    applySnapshot,
 
     getCanvasSize: () => ({
       width: compositeRef.current?.width || 0,
@@ -395,11 +515,77 @@ const ArtCanvas = forwardRef((props, ref) => {
   }));
 
   const brushType = useArtStore(s => s.brushType);
+  const symmetryMode = useArtStore(s => s.symmetryMode);
+  const symmetryLines = useArtStore(s => s.symmetryLines);
+
+  const drawSymmetryGuides = useCallback(() => {
+    const canvas = guideRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    if (symmetryMode === 'none') return;
+    
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    
+    ctx.strokeStyle = 'rgba(124, 58, 237, 0.4)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([6, 4]);
+    
+    if (symmetryMode === 'vertical' || symmetryMode === 'both') {
+      ctx.beginPath();
+      ctx.moveTo(cx, 0);
+      ctx.lineTo(cx, canvas.height);
+      ctx.stroke();
+    }
+    
+    if (symmetryMode === 'horizontal' || symmetryMode === 'both') {
+      ctx.beginPath();
+      ctx.moveTo(0, cy);
+      ctx.lineTo(canvas.width, cy);
+      ctx.stroke();
+    }
+    
+    if (symmetryMode === 'radial') {
+      for (let i = 0; i < symmetryLines; i++) {
+        const angle = (Math.PI * 2 * i) / symmetryLines;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(
+          cx + Math.cos(angle) * Math.max(canvas.width, canvas.height),
+          cy + Math.sin(angle) * Math.max(canvas.width, canvas.height)
+        );
+        ctx.stroke();
+      }
+    }
+    
+    ctx.setLineDash([]);
+  }, [symmetryMode, symmetryLines]);
+
+  useEffect(() => {
+    drawSymmetryGuides();
+  }, [drawSymmetryGuides]);
 
   return (
     <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative', background: '#ffffff', overflow: 'hidden' }}>
       <canvas ref={compositeRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', touchAction: 'none' }} />
       <canvas ref={activeRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', touchAction: 'none', zIndex: 10, cursor: brushType === 'eyedropper' ? 'crosshair' : 'default' }} />
+      <canvas ref={guideRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 15 }} />
+      
+      {symmetryMode !== 'none' && (
+        <div 
+          onClick={() => useArtStore.getState().setSymmetryMode('none')}
+          style={{
+            position: 'absolute', top: '12px', left: '50%', transform: 'translateX(-50%)',
+            background: 'rgba(124,58,237,0.15)', border: '1px solid var(--border-accent)',
+            fontFamily: 'Fira Code', fontSize: '11px', color: 'var(--accent-bright)',
+            padding: '4px 8px', borderRadius: '12px', cursor: 'pointer', zIndex: 20
+          }}
+        >
+          ⊹ Symmetry: {symmetryMode === 'radial' ? `Radial ${symmetryLines}` : symmetryMode.charAt(0).toUpperCase() + symmetryMode.slice(1)}
+        </div>
+      )}
     </div>
   );
 });

@@ -115,6 +115,18 @@
   height: 28px;
 }
 
+.tool-btn.symmetry-btn.active {
+  background: rgba(124, 58, 237, 0.15) !important;
+  color: var(--accent-bright);
+  border: 1px solid var(--accent-bright) !important;
+  animation: pulse-border 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse-border {
+  0%, 100% { border-color: rgba(124, 58, 237, 0.3) !important; }
+  50% { border-color: var(--accent-bright) !important; }
+}
+
 .radial-lines-input {
   display: flex;
   flex-direction: column;
@@ -124,14 +136,15 @@
 }
 
 .radial-lines-input input {
-  width: 32px;
-  height: 20px;
+  width: 48px;
+  height: 24px;
   background: var(--bg-hover);
   border: 1px solid var(--border);
   border-radius: 4px;
   color: var(--text-primary);
   text-align: center;
-  font-size: 11px;
+  font-family: 'Fira Code', monospace;
+  font-size: 12px;
 }
 
 .zoom-display {
