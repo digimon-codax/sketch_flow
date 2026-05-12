@@ -297,7 +297,7 @@ export default function CanvasPage() {
 
   return (
     <CanvasContext.Provider value={fabricCanvasRef}>
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--bg-base)', position: 'relative' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', background: 'var(--bg-base)', position: 'relative' }}>
         {toastMessage && (
           <div style={{
             position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)',

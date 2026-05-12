@@ -220,7 +220,7 @@ export default function Dashboard() {
   });
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg-base)', fontFamily: 'Inter, sans-serif', position: 'relative', overflowX: 'hidden' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg-base)', fontFamily: 'Inter, sans-serif', position: 'relative', overflowX: 'hidden', overflowY: 'auto' }}>
       <div className="starry-bg"></div>
       {/* ── Inline styles ─────────────────────────────────── */}
       <style>{`
