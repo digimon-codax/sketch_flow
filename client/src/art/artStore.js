@@ -108,5 +108,9 @@ export const useArtStore = create((set) => ({
     });
     return snapshot;
   },
+
+  // ── Save Tracking ────────────────────────────────────────────────────────
+  lastSavedDataURL: null,
+  setLastSavedDataURL: (url) => set({ lastSavedDataURL: url }),
 }));
 

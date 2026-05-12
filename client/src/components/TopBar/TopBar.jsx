@@ -361,6 +361,7 @@ export default function TopBar({ diagramId, diagramName, saveState, artCanvasRef
           updatedAt: Date.now(),
         }
       });
+      useArtStore.getState().setLastSavedDataURL(dataURL);
       setArtSaved(true);
       useUIStore.getState().showToast('Artwork saved');
       setTimeout(() => setArtSaved(false), 2500);

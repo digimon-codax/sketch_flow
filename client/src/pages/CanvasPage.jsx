@@ -348,7 +348,7 @@ export default function CanvasPage() {
         ) : (
           <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
             <ArtToolbar artCanvasRef={artCanvasRef} />
-            <ArtCanvas ref={artCanvasRef} />
+            <ArtCanvas ref={artCanvasRef} artData={diagram?.artData} ws={ws} diagramId={id} userId={(JSON.parse(localStorage.getItem('sf_user') || '{}').id || JSON.parse(localStorage.getItem('sf_user') || '{}')._id || '').toString()} />
             <ArtRightPanel artCanvasRef={artCanvasRef} />
           </div>
         )}

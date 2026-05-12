@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useImperativeHandle, forwardRef, useCallback } from 'react';
 import { useArtStore } from './artStore';
 
-const ArtCanvas = forwardRef(({ artData }, ref) => {
+const ArtCanvas = forwardRef(({ artData, ws, diagramId, userId }, ref) => {
   const containerRef = useRef(null);
   const compositeRef = useRef(null);
   const activeRef = useRef(null);
@@ -21,6 +21,9 @@ const ArtCanvas = forwardRef(({ artData }, ref) => {
   const activePointerType = useRef(null);
   const activePointers = useRef(new Map());
   const lastPinchDist = useRef(null);
+
+  // Collaboration throttle
+  const lastArtStrokeSend = useRef(0);
 
   // ─── LAYER CANVAS MANAGEMENT ───────────────────────────────────────────
   const createLayerCanvas = useCallback((layerId, width, height) => {
@@ -218,6 +221,26 @@ const ArtCanvas = forwardRef(({ artData }, ref) => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [applySnapshot]);
 
+  // ─── COLLABORATION LISTENER ──────────────────────────────────────────────
+  useEffect(() => {
+    if (!ws || !diagramId || !userId) return;
+
+    ws.on('ART_STROKE', msg => {
+      if (msg.userId === userId) return; // ignore our own strokes
+      const { layerId, layerDataURL } = msg.payload;
+      const canvas = layerCanvases.current.get(layerId);
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const img = new Image();
+      img.onload = () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0);
+        recompositeAllLayers();
+      };
+      img.src = layerDataURL;
+    });
+  }, [ws, diagramId, userId, recompositeAllLayers]);
+
   // ─── POINTER EVENTS ────────────────────────────────────────────────────
   useEffect(() => {
     const actCanvas = activeRef.current;
@@ -315,6 +338,19 @@ const ArtCanvas = forwardRef(({ artData }, ref) => {
         drawWithSymmetry(last.x, last.y, x, y, pressure);
         lastPoint.current = { x, y, pressure };
       });
+
+      // Broadcast throttled update
+      const now = Date.now();
+      if (ws && diagramId && userId && now - lastArtStrokeSend.current > 500) {
+        lastArtStrokeSend.current = now;
+        const layerDataURL = layerCanvases.current.get(useArtStore.getState().activeLayerId)?.toDataURL();
+        if (layerDataURL) {
+          ws.send('ART_STROKE', diagramId, userId, {
+            layerId: useArtStore.getState().activeLayerId,
+            layerDataURL
+          });
+        }
+      }
     };
 
     const onPointerUp = (e) => {
@@ -354,6 +390,17 @@ const ArtCanvas = forwardRef(({ artData }, ref) => {
 
       recompositeAllLayers();
       takeSnapshot();
+
+      // Final broadcast
+      if (ws && diagramId && userId) {
+        const layerDataURL = layerCanvases.current.get(state.activeLayerId)?.toDataURL();
+        if (layerDataURL) {
+          ws.send('ART_STROKE', diagramId, userId, {
+            layerId: state.activeLayerId,
+            layerDataURL
+          });
+        }
+      }
 
       lastPoint.current = null;
       currentPath.current = [];

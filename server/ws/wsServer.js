@@ -111,6 +111,13 @@ export function initWSServer(httpServer) {
           break;
         }
 
+        // ── ART_STROKE ─────────────────────────────────────────────────────
+        case "ART_STROKE": {
+          if (!roomId) break;
+          pub.publish("room:" + roomId, JSON.stringify(msg));
+          break;
+        }
+
         // ── LEAVE_ROOM ─────────────────────────────────────────────────────
         case "LEAVE_ROOM": {
           if (!roomId || !userId) break;
